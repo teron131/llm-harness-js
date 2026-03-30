@@ -1,35 +1,42 @@
 /** Stream chunk parsing helpers. */
 
 import { getHarnessEventStream } from "./events.js";
-/** Parse the Stream chunk parsing stream. */
+
+type StreamParseChunk = string | [string | null, string | null];
+
+function splitStreamChunk(
+  chunk: StreamParseChunk,
+): readonly [reasoningText: string | null, answerText: string | null] {
+  return Array.isArray(chunk) ? chunk : [null, chunk];
+}
 
 export async function* getStreamGenerator(
   stream: AsyncIterable<Record<string, unknown>>,
   includeReasoning = false,
-): AsyncGenerator<string | [string | null, string | null]> {
-  let reasoningYielded = false;
+): AsyncGenerator<StreamParseChunk> {
+  let hasYieldedReasoning = false;
 
   for await (const event of getHarnessEventStream(stream, {
     includeReasoning,
     dedupeReasoning: true,
     emitReasoningBoundaries: false,
   })) {
+    if (event.type === "text-delta") {
+      yield includeReasoning ? [null, event.delta] : event.delta;
+      continue;
+    }
     if (
-      event.type === "reasoning-delta" &&
-      includeReasoning &&
-      !reasoningYielded
+      event.type !== "reasoning-delta" ||
+      !includeReasoning ||
+      hasYieldedReasoning
     ) {
-      reasoningYielded = true;
-      yield [event.delta, null];
       continue;
     }
 
-    if (event.type === "text-delta") {
-      yield includeReasoning ? [null, event.delta] : event.delta;
-    }
+    hasYieldedReasoning = true;
+    yield [event.delta, null];
   }
 }
-/** Parse the Stream chunk parsing stream. */
 
 export async function parseStream(
   stream: AsyncIterable<Record<string, unknown>>,
@@ -38,21 +45,18 @@ export async function parseStream(
   let reasoning: string | null = null;
   const answerParts: string[] = [];
 
-  for await (const item of getStreamGenerator(stream, includeReasoning)) {
-    const [reasoningChunk, answerChunk] = Array.isArray(item)
-      ? item
-      : ([null, item] as const);
+  for await (const chunk of getStreamGenerator(stream, includeReasoning)) {
+    const [reasoningText, answerText] = splitStreamChunk(chunk);
 
-    if (reasoningChunk !== null) {
-      reasoning = reasoningChunk;
-      // Keep parity with Python parser side effects during stream parsing.
+    if (reasoningText !== null) {
+      reasoning = reasoningText;
       // eslint-disable-next-line no-console
       console.log(`Reasoning: ${reasoning}`);
     }
-    if (answerChunk !== null) {
-      answerParts.push(answerChunk);
+    if (answerText !== null) {
+      answerParts.push(answerText);
       // eslint-disable-next-line no-console
-      process.stdout.write(answerChunk);
+      process.stdout.write(answerText);
     }
   }
 

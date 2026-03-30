@@ -1,4 +1,4 @@
-/** Client adapter helpers. */
+/** Parser convenience exports. */
 
 export { parseStream } from "./parsers/chunks.js";
 export { getMetadata } from "./parsers/metadata.js";
