@@ -26,7 +26,15 @@ export type {
 /** Centralized stage config for the LLM stats pipeline so matching, enrichment, pruning, and scoring tune from one place. */
 export const LLM_STATS_STAGE_CONFIG = {
   matcher: {
-    variantTokens: ["flash-lite", "flash", "pro", "nano", "mini", "lite"],
+    variantTokens: [
+      "flash-lite",
+      "flash",
+      "pro",
+      "nano",
+      "mini",
+      "lite",
+      "max",
+    ],
   },
   openrouter: {
     speedConcurrency: 8,
