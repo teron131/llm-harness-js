@@ -15,15 +15,11 @@ export { ChatGemini, createGeminiCache, GeminiEmbeddings } from "./gemini.js";
 export { MediaMessage } from "./multimodal.js";
 export { ChatOpenRouter, OpenRouterEmbeddings } from "./openrouter.js";
 export {
-  getHarnessEventStream,
   getMetadata,
-  getStreamGenerator,
-  HarnessEventStreamOptions,
-  HarnessStreamEvent,
-  HarnessToolState,
   parseBatch,
   parseInvoke,
   parseStream,
+  StructuredOutput,
 } from "./parser.js";
 export {
   createCaptureUsageNode,
@@ -33,5 +29,5 @@ export {
   getUsage,
   resetUsage,
   trackUsage,
-  UsageMetadata,
+  type UsageMetadata,
 } from "./usage.js";

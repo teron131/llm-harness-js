@@ -3,6 +3,7 @@
 export {
   filterContent,
   makeFsTools,
+  type TagRange,
   TagRangeSchema,
   tagContent,
   untagContent,

@@ -5,8 +5,6 @@ import {
   scrapeYoutube,
 } from "../../tools/youtube/scraper.js";
 import type { Summary } from "./schemas.js";
-
-export { SummarySchema } from "./schemas.js";
 /** Summarize a YouTube video or transcript. */
 
 export async function summarizeVideo(

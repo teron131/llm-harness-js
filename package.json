@@ -1,7 +1,7 @@
 {
   "name": "llm-harness-js",
   "version": "0.1.0",
-  "description": "TypeScript port of llm_harness with 1:1 functionality parity",
+  "description": "TypeScript harness for tools, agents, and model stats workflows",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
