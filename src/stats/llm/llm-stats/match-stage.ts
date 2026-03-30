@@ -6,7 +6,6 @@ import {
   asRecord,
   modelSlugFromModelId,
   normalizeProviderModelId,
-  type JsonObject,
 } from "../shared";
 
 import {

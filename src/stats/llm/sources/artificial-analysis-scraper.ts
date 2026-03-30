@@ -10,7 +10,7 @@ const SPARSE_COLUMN_NULL_RATIO = 0.5;
 const MODEL_SEARCH_BACKTRACK_CHARS = 20_000;
 const MIN_INTELLIGENCE_COST_TOKEN_THRESHOLD = 1_000_000;
 const NEXT_FLIGHT_CHUNK_REGEX =
-  /self\.__next_f\.push\(\[1,\"([\s\S]*?)\"\]\)<\/script>/g;
+  /self\.__next_f\.push\(\[1,"([\s\S]*?)"\]\)<\/script>/g;
 
 export type ArtificialAnalysisScraperOptions = {
   url?: string;
@@ -102,39 +102,6 @@ function pickEvaluations(row: JsonObject): JsonObject {
 /** Select the relevant score fields for Artificial Analysis scraper. */
 
 function pickIntelligence(row: JsonObject): JsonObject {
-  const intelligenceTokenCounts = asRecord(row.intelligence_index_token_counts);
-  const inputTokens =
-    typeof intelligenceTokenCounts.input_tokens === "number"
-      ? intelligenceTokenCounts.input_tokens
-      : typeof row.total_input_tokens_api === "number"
-        ? row.total_input_tokens_api
-        : typeof row.input_tokens === "number"
-          ? row.input_tokens
-          : null;
-  const tokenCountOutputTokens =
-    typeof intelligenceTokenCounts.output_tokens === "number"
-      ? intelligenceTokenCounts.output_tokens
-      : null;
-  const tokenCountAnswerTokens =
-    typeof intelligenceTokenCounts.answer_tokens === "number"
-      ? intelligenceTokenCounts.answer_tokens
-      : null;
-  const tokenCountReasoningTokens =
-    typeof intelligenceTokenCounts.reasoning_tokens === "number"
-      ? intelligenceTokenCounts.reasoning_tokens
-      : null;
-  const tokenCountOutputFromParts =
-    (tokenCountAnswerTokens ?? 0) + (tokenCountReasoningTokens ?? 0) > 0
-      ? (tokenCountAnswerTokens ?? 0) + (tokenCountReasoningTokens ?? 0)
-      : null;
-  const outputTokens =
-    tokenCountOutputTokens ??
-    tokenCountOutputFromParts ??
-    (typeof row.total_answer_tokens_api === "number"
-      ? row.total_answer_tokens_api
-      : null) ??
-    (typeof row.output_tokens === "number" ? row.output_tokens : null);
-
   const intelligence: JsonObject = {
     intelligence_index:
       typeof row.intelligence_index === "number"

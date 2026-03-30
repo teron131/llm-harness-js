@@ -50,12 +50,10 @@ export async function parseStream(
 
     if (reasoningText !== null) {
       reasoning = reasoningText;
-      // eslint-disable-next-line no-console
       console.log(`Reasoning: ${reasoning}`);
     }
     if (answerText !== null) {
       answerParts.push(answerText);
-      // eslint-disable-next-line no-console
       process.stdout.write(answerText);
     }
   }

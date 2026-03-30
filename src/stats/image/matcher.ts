@@ -133,7 +133,7 @@ function normalizeModelName(value: string): string {
     value
       .toLowerCase()
       // Preserve bracketed qualifiers as tokens, only strip bracket chars.
-      .replace(/[\[\]()]/g, " ")
+      .replace(/[[\]()]/g, " ")
       .replace(/[._:/]+/g, "-")
       .replace(/[^a-z0-9-]+/g, "-")
       .replace(/-+/g, "-")

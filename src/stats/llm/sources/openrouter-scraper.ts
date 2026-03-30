@@ -1,7 +1,7 @@
 /** OpenRouter scraper helpers for model stats. */
 
 import { fetchWithTimeout, nowEpochSeconds } from "../../utils";
-import { asRecord, type JsonObject } from "../shared";
+import { asRecord } from "../shared";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/frontend/models";
 const OPENROUTER_THROUGHPUT_URL =
