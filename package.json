@@ -18,6 +18,10 @@
     "aa:stats": "bun ./scripts/run-aa-stats.mjs",
     "image:reference": "bun ./scripts/run-image-stats-reference.mjs",
     "stats:parity": "bun ./scripts/run-stats-parity-snapshot.mjs",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -42,8 +46,13 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.18.1",
+    "eslint": "^10.1.0",
+    "globals": "^17.4.0",
+    "prettier": "^3.8.1",
     "typescript": "^5.9.2",
+    "typescript-eslint": "^8.57.2",
     "vitest": "^2.1.8"
   }
 }
