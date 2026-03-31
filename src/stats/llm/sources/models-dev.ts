@@ -8,7 +8,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 type NumberOrNull = number | null;
 
-export type ModelRecord = {
+type ModelRecord = {
   id?: string;
   name?: string;
   family?: string;
@@ -35,7 +35,7 @@ export type ModelRecord = {
   [key: string]: unknown;
 };
 
-export type ProviderRecord = {
+type ProviderRecord = {
   id?: string;
   name?: string;
   api?: string;
@@ -43,9 +43,9 @@ export type ProviderRecord = {
   [key: string]: unknown;
 };
 
-export type ModelsDevPayload = Record<string, ProviderRecord>;
+type ModelsDevPayload = Record<string, ProviderRecord>;
 
-export type ModelsDevFlatModel = {
+type ModelsDevFlatModel = {
   provider_id: string;
   provider_name: string;
   model_id: string;
@@ -64,7 +64,7 @@ type ModelsDevSourcePayload = {
  * When fetching fails, `fetched_at_epoch_seconds` and `status_code` are `null`
  * and `models` is an empty array.
  */
-export type ModelsDevOutputPayload = {
+type ModelsDevOutputPayload = {
   fetched_at_epoch_seconds: number | null;
   status_code: number | null;
   models: ModelsDevFlatModel[];

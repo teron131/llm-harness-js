@@ -62,7 +62,7 @@ export type OpenRouterPerformanceSummary = {
   e2e_latency_seconds_median: number | null;
 };
 
-export type OpenRouterPricingSummary = {
+type OpenRouterPricingSummary = {
   weighted_input_price_per_1m: number | null;
   weighted_output_price_per_1m: number | null;
 };

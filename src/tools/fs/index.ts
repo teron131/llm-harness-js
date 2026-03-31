@@ -2,7 +2,6 @@
 
 export {
   filterContent,
-  type TagRange,
   TagRangeSchema,
   tagContent,
   untagContent,

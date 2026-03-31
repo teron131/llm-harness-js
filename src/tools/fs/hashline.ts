@@ -8,14 +8,14 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
-export const HASHLINE_OPERATION_VALUES = [
+const HASHLINE_OPERATION_VALUES = [
   "replace_range",
   "insert_before",
   "insert_after",
 ] as const;
 
-export const HashlineOperationSchema = z.enum(HASHLINE_OPERATION_VALUES);
-export type HashlineOperation = z.infer<typeof HashlineOperationSchema>;
+const HashlineOperationSchema = z.enum(HASHLINE_OPERATION_VALUES);
+type HashlineOperation = z.infer<typeof HashlineOperationSchema>;
 
 export const HashlineEditSchema = z
   .object({
@@ -46,16 +46,7 @@ export const HashlineEditSchema = z
 
 export type HashlineEdit = z.infer<typeof HashlineEditSchema>;
 
-export const HashlineEditResponseSchema = z.object({
-  edits: z
-    .array(HashlineEditSchema)
-    .default([])
-    .describe("Edit batch for the current file."),
-});
-
-export type HashlineEditResponse = z.infer<typeof HashlineEditResponseSchema>;
-
-export class HashlineReferenceError extends Error {
+class HashlineReferenceError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "HashlineReferenceError";
@@ -73,7 +64,7 @@ const HASHLINE_LINE_RE = new RegExp(
 const NEARBY_HASHLINE_WINDOW = 3;
 const TEXT_ENCODER = new TextEncoder();
 
-export function computeLineHash(lineNumber: number, line: string): string {
+function computeLineHash(lineNumber: number, line: string): string {
   const normalizedLine = line.replace(/\r$/u, "").replace(WHITESPACE_RE, "");
   const payload = TEXT_ENCODER.encode(`${lineNumber}\0${normalizedLine}`);
   return createHash("sha256")
@@ -82,7 +73,7 @@ export function computeLineHash(lineNumber: number, line: string): string {
     .slice(0, VISIBLE_HASH_LENGTH);
 }
 
-export function formatHashlineRef(lineNumber: number, line: string): string {
+function formatHashlineRef(lineNumber: number, line: string): string {
   return `${lineNumber}#${computeLineHash(lineNumber, line)}`;
 }
 

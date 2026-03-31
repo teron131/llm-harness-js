@@ -20,7 +20,7 @@ function getApiKey(name: string): string | null {
   return value ? value : null;
 }
 
-export const ChannelSchema = z
+const ChannelSchema = z
   .object({
     id: z.string().optional(),
     url: z.string().optional(),
@@ -29,7 +29,7 @@ export const ChannelSchema = z
   })
   .passthrough();
 
-export const TranscriptSegmentSchema = z
+const TranscriptSegmentSchema = z
   .object({
     text: z.string().optional(),
     startMs: z.coerce.number().optional(),
@@ -38,7 +38,7 @@ export const TranscriptSegmentSchema = z
   })
   .passthrough();
 
-export const YouTubeScraperResultSchema = z
+const YouTubeScraperResultSchema = z
   .object({
     success: z.boolean().optional(),
     credits_remaining: z.number().optional(),
@@ -64,7 +64,7 @@ export const YouTubeScraperResultSchema = z
   })
   .passthrough();
 
-export type YouTubeScraperResult = z.infer<typeof YouTubeScraperResultSchema>;
+type YouTubeScraperResult = z.infer<typeof YouTubeScraperResultSchema>;
 /** Return whether transcript is true. */
 
 function hasTranscript(result: YouTubeScraperResult): boolean {

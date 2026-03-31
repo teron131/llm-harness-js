@@ -10,10 +10,7 @@ const DEFAULT_MIN_MODEL_AGE_DAYS = 365;
 type NumberOrNull = number | null;
 type GroupName = "Photorealistic" | "Illustrative" | "Contextual";
 
-export const ARTIFICIAL_ANALYSIS_IMAGE_GROUPS: Record<
-  GroupName,
-  readonly string[]
-> = {
+const ARTIFICIAL_ANALYSIS_IMAGE_GROUPS: Record<GroupName, readonly string[]> = {
   Photorealistic: [
     "General & Photorealistic",
     "People: Portraits",
@@ -60,7 +57,7 @@ type RawCategory = {
   [key: string]: unknown;
 };
 
-export type ArtificialAnalysisImageModel = {
+type ArtificialAnalysisImageModel = {
   release_date?: string;
   categories?: RawCategory[];
   [key: string]: unknown;
@@ -74,7 +71,7 @@ type Aggregator = Record<
   }
 >;
 
-export type ArtificialAnalysisImagePercentiles = {
+type ArtificialAnalysisImagePercentiles = {
   photorealistic_percentile: NumberOrNull;
   illustrative_percentile: NumberOrNull;
   contextual_percentile: NumberOrNull;

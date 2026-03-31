@@ -10,7 +10,7 @@ function splitStreamChunk(
   return Array.isArray(chunk) ? chunk : [null, chunk];
 }
 
-export async function* getStreamGenerator(
+async function* getStreamGenerator(
   stream: AsyncIterable<Record<string, unknown>>,
   includeReasoning = false,
 ): AsyncGenerator<StreamParseChunk> {

@@ -42,7 +42,7 @@ export function getContentBlocks(
 }
 /** Extract the open router reasoning details. */
 
-export function extractOpenRouterReasoningDetails(
+function extractOpenRouterReasoningDetails(
   chunk: Record<string, unknown>,
 ): string {
   const details = chunk.reasoning_details;
@@ -83,7 +83,7 @@ export function extractOpenRouterReasoningDetails(
 }
 /** Extract the additional kwargs reasoning. */
 
-export function extractAdditionalKwargsReasoning(
+function extractAdditionalKwargsReasoning(
   chunk: Record<string, unknown>,
 ): string | null {
   const additionalKwargs = chunk.additional_kwargs;

@@ -7,7 +7,7 @@ export const TagRangeSchema = z.object({
   end_tag: z.string().describe("The ending line tag, e.g., [L20]"),
 });
 
-export type TagRange = z.infer<typeof TagRangeSchema>;
+type TagRange = z.infer<typeof TagRangeSchema>;
 /** Tag the content. */
 
 export function tagContent(text: string): string {

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { TagRangeSchema } from "../../tools/fs/fast-copy.js";
 import { s2hk } from "../../utils/text-utils.js";
 
-export const ChapterSchema = z.object({
+const ChapterSchema = z.object({
   title: z.string().transform((value) => s2hk(value)),
   description: z.string().transform((value) => s2hk(value)),
   start_time: z.string().optional().nullable(),
@@ -17,11 +17,10 @@ export const SummarySchema = z.object({
   chapters: z.array(ChapterSchema).min(1),
 });
 
-export type Chapter = z.output<typeof ChapterSchema>;
 export type Summary = z.output<typeof SummarySchema>;
 /** Helper for summary to text. */
 
-export function summaryToText(summary: Summary): string {
+function summaryToText(summary: Summary): string {
   const lines = [
     "=".repeat(80),
     "SUMMARY:",
@@ -47,7 +46,7 @@ export const GarbageIdentificationSchema = z.object({
   garbage_ranges: z.array(TagRangeSchema),
 });
 
-export const RateSchema = z.object({
+const RateSchema = z.object({
   rate: z.enum(["Fail", "Refine", "Pass"]),
   reason: z.string(),
 });
@@ -61,10 +60,10 @@ export const QualitySchema = z.object({
   correct_language: RateSchema,
 });
 
-export type Quality = z.infer<typeof QualitySchema>;
+type Quality = z.infer<typeof QualitySchema>;
 /** Helper for all aspects. */
 
-export function allAspects(quality: Quality) {
+function allAspects(quality: Quality) {
   return [
     quality.completeness,
     quality.structure,

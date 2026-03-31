@@ -12,7 +12,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const MIN_VALID_ROWS = 20;
 const MIN_VALID_CATEGORIES = 4;
 
-export const ARENA_AI_DEFAULT_CATEGORY_SLUGS = [
+const ARENA_AI_DEFAULT_CATEGORY_SLUGS = [
   "commercial-design",
   "3d-modeling",
   "cartoon",
@@ -27,7 +27,7 @@ type ArenaAiImageGroupedCategoryName =
   | "illustrative"
   | "contextual";
 
-export const ARENA_AI_GROUPED_CATEGORY_SLUGS: Record<
+const ARENA_AI_GROUPED_CATEGORY_SLUGS: Record<
   ArenaAiImageGroupedCategoryName,
   readonly string[]
 > = {
@@ -47,7 +47,7 @@ const ARENA_AI_GROUP_BY_SLUG = new Map<string, ArenaAiImageGroupedCategoryName>(
 
 type NumberOrNull = number | null;
 
-export type ArenaAiImageRow = {
+type ArenaAiImageRow = {
   model: string;
   provider: string | null;
   score: NumberOrNull;
@@ -55,7 +55,7 @@ export type ArenaAiImageRow = {
   votes: NumberOrNull;
 };
 
-export type ArenaAiImageCategoryPayload = {
+type ArenaAiImageCategoryPayload = {
   fetched_at_epoch_seconds: number;
   category_slug: string;
   source_url: string;
@@ -66,7 +66,7 @@ export type ArenaAiImageCategoryPayload = {
   rows: ArenaAiImageRow[];
 };
 
-export type ArenaAiImageAggregatedCategoryRow = {
+type ArenaAiImageAggregatedCategoryRow = {
   rank: number;
   score: NumberOrNull;
   ci95: string | null;

@@ -34,7 +34,7 @@ function calculateCost(
 }
 /** Analyze a YouTube video URL with Gemini. */
 
-export async function analyzeVideoUrl({
+async function analyzeVideoUrl({
   videoUrl,
   model = DEFAULT_MODEL,
   thinkingLevel = "medium",

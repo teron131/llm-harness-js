@@ -1,14 +1,14 @@
 /** Minimal single-file patch tool. */
 
-export const BEGIN_PATCH_MARKER = "*** Begin Patch";
-export const END_PATCH_MARKER = "*** End Patch";
-export const UPDATE_FILE_MARKER = "*** Update File: ";
-export const MOVE_TO_MARKER = "*** Move to: ";
-export const EOF_MARKER = "*** End of File";
-export const CHANGE_CONTEXT_MARKER = "@@ ";
-export const EMPTY_CHANGE_CONTEXT_MARKER = "@@";
+const BEGIN_PATCH_MARKER = "*** Begin Patch";
+const END_PATCH_MARKER = "*** End Patch";
+const UPDATE_FILE_MARKER = "*** Update File: ";
+const MOVE_TO_MARKER = "*** Move to: ";
+const EOF_MARKER = "*** End of File";
+const CHANGE_CONTEXT_MARKER = "@@ ";
+const EMPTY_CHANGE_CONTEXT_MARKER = "@@";
 
-export interface UpdateFileChunk {
+interface UpdateFileChunk {
   change_context: string | null;
   old_lines: string[];
   new_lines: string[];
@@ -17,13 +17,13 @@ export interface UpdateFileChunk {
   inserted_lines: number;
 }
 
-export interface UpdateFileHunk {
+interface UpdateFileHunk {
   path: string;
   move_path: string | null;
   chunks: UpdateFileChunk[];
 }
 
-export interface PatchStats {
+interface PatchStats {
   hunk_count: number;
   lines_removed: number;
   lines_inserted: number;
@@ -68,33 +68,6 @@ const PUNCTUATION_TRANSLATION: Record<string, string> = {
   "\u2212": "-",
   "\u3000": " ",
 };
-
-export function applyPatchToText(args: {
-  patch_text: string;
-  original_text: string;
-  target_path: string;
-}): string {
-  return applyPatchToTextWithStats(args)[0];
-}
-
-export function applyPatchToTextWithStats(args: {
-  patch_text: string;
-  original_text: string;
-  target_path: string;
-}): [string, PatchStats] {
-  const [hunk, patchStats] = parseSingleFilePatchWithStats({
-    patch_text: args.patch_text,
-    target_path: args.target_path,
-  });
-  return [
-    applyPatchHunkToText({
-      original_text: args.original_text,
-      file_path: args.target_path,
-      hunk,
-    }),
-    patchStats,
-  ];
-}
 
 export function parseSingleFilePatchWithStats(args: {
   patch_text: string;

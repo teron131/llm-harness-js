@@ -17,8 +17,8 @@ import {
   type HashlineEdit,
 } from "./hashline.js";
 
-export const PATH_TRAVERSAL_ERROR = "Path traversal not allowed";
-export const PATH_OUTSIDE_ROOT_ERROR = "Path outside root";
+const PATH_TRAVERSAL_ERROR = "Path traversal not allowed";
+const PATH_OUTSIDE_ROOT_ERROR = "Path outside root";
 
 const READ_TEXT_SCHEMA = z.object({
   path: z.string(),
@@ -45,7 +45,7 @@ const EDIT_WITH_ED_SCHEMA = z.object({
 
 type TextTransform = (text: string) => string | Promise<string>;
 
-export class SandboxFS {
+class SandboxFS {
   readonly rootDir: string;
 
   constructor(rootDir: string) {

@@ -67,9 +67,7 @@ export function isNumericToken(token: string | undefined): boolean {
 }
 /** Parse the numeric or bscale token. */
 
-export function parseNumericOrBScaleToken(
-  token: string | undefined,
-): number | null {
+function parseNumericOrBScaleToken(token: string | undefined): number | null {
   if (!token) {
     return null;
   }

@@ -24,7 +24,7 @@ export type {
 };
 
 /** Centralized stage config for the LLM stats pipeline so matching, enrichment, pruning, and scoring tune from one place. */
-export const LLM_STATS_STAGE_CONFIG = {
+const LLM_STATS_STAGE_CONFIG = {
   matcher: {
     variantTokens: [
       "flash-lite",

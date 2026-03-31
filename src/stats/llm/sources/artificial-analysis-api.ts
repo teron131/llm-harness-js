@@ -80,7 +80,7 @@ type Percentiles = {
 
 type ScoredModel = BaseModel & { scores: Scores };
 
-export type ArtificialAnalysisEnrichedModel = BaseModel & {
+type ArtificialAnalysisEnrichedModel = BaseModel & {
   scores: Scores;
   percentiles: Percentiles;
 };
@@ -97,7 +97,7 @@ type SourcePayload = {
  * When fetching fails, `fetched_at_epoch_seconds` and `status_code` are `null`
  * and `models` is an empty array.
  */
-export type ArtificialAnalysisOutputPayload = {
+type ArtificialAnalysisOutputPayload = {
   fetched_at_epoch_seconds: number | null;
   status_code: number | null;
   models: ArtificialAnalysisEnrichedModel[];
