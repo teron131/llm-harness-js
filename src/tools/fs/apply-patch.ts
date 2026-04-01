@@ -1,4 +1,10 @@
-/** Minimal single-file patch tool. */
+/**
+ * Minimal single-file patch tool.
+ *
+ * The parser accepts the `*** Begin Patch` / `*** Update File` format and
+ * resolves each chunk against existing text with a small amount of whitespace
+ * and punctuation tolerance.
+ */
 
 const BEGIN_PATCH_MARKER = "*** Begin Patch";
 const END_PATCH_MARKER = "*** End Patch";
@@ -8,6 +14,11 @@ const EOF_MARKER = "*** End of File";
 const CHANGE_CONTEXT_MARKER = "@@ ";
 const EMPTY_CHANGE_CONTEXT_MARKER = "@@";
 
+/**
+ * One local block of line changes inside a file patch.
+ *
+ * Each `@@` section in an update-file block becomes one patch chunk.
+ */
 interface PatchChunk {
   change_context: string | null;
   old_lines: string[];
@@ -17,12 +28,14 @@ interface PatchChunk {
   inserted_lines: number;
 }
 
+/** All patch chunks that apply to one file update section. */
 interface FilePatch {
   path: string;
   move_path: string | null;
   chunks: PatchChunk[];
 }
 
+/** Summarize how many chunks and line changes a parsed patch contains. */
 interface PatchStats {
   chunk_count: number;
   lines_removed: number;
@@ -68,6 +81,7 @@ const PUNCTUATION_TRANSLATION: Record<string, string> = {
   "\u3000": " ",
 };
 
+/** Parse one-file patch text and return both the patch and its summary stats. */
 export function parseSingleFilePatchWithStats(args: {
   patch_text: string;
   target_path?: string;
@@ -84,6 +98,7 @@ export function parseSingleFilePatchWithStats(args: {
   return [filePatch, collectPatchStats(filePatches)];
 }
 
+/** Apply parsed patch chunks to file text while preserving trailing-newline state. */
 export function applyPatchChunksToText(args: {
   original_text: string;
   file_path: string;
@@ -113,6 +128,7 @@ export function applyPatchChunksToText(args: {
   return `${updatedLines.join("\n")}${hasTrailingNewline ? "\n" : ""}`;
 }
 
+/** Ensure the parsed patch targets the expected file and uses supported features. */
 function validateSingleFilePatch(
   filePatch: FilePatch,
   targetPath?: string,
@@ -132,10 +148,12 @@ function validateSingleFilePatch(
   return filePatch;
 }
 
+/** Strip any leading slashes so patch paths compare consistently. */
 function normalizePatchPath(path: string): string {
   return path.replace(/^\/+/, "");
 }
 
+/** Parse raw patch text into ordered per-file patch sections. */
 function parsePatchText(patchText: string): FilePatch[] {
   const stripped = patchText.trim();
   if (!stripped) {
@@ -207,6 +225,7 @@ function parsePatchText(patchText: string): FilePatch[] {
   return filePatches;
 }
 
+/** Parse a single chunk and report how many source lines it consumed. */
 function parsePatchChunk(
   lines: string[],
   allowMissingContextMarker: boolean,
@@ -286,6 +305,7 @@ function parsePatchChunk(
   ];
 }
 
+/** Aggregate chunk and line-change totals across parsed file patches. */
 function collectPatchStats(filePatches: FilePatch[]): PatchStats {
   let chunkCount = 0;
   let linesRemoved = 0;
@@ -307,6 +327,7 @@ function collectPatchStats(filePatches: FilePatch[]): PatchStats {
   };
 }
 
+/** Return whether a line starts the next chunk or file-level patch marker. */
 function isChunkBoundary(line: string): boolean {
   const stripped = line.trim();
   return (
@@ -316,6 +337,7 @@ function isChunkBoundary(line: string): boolean {
   );
 }
 
+/** Resolve each patch chunk to a concrete list replacement against the original lines. */
 function computeReplacements(
   originalLines: string[],
   filePath: string,
@@ -344,6 +366,7 @@ function computeReplacements(
   return replacements.sort((left, right) => left[0] - right[0]);
 }
 
+/** Advance the search cursor to the chunk's context anchor when one is present. */
 function advanceToChunkContext(
   lines: string[],
   filePath: string,
@@ -368,6 +391,7 @@ function advanceToChunkContext(
   return contextIndex + 1;
 }
 
+/** Find the splice instruction that applies one parsed patch chunk. */
 function findChunkReplacement(
   lines: string[],
   filePath: string,
@@ -407,6 +431,7 @@ function findChunkReplacement(
   );
 }
 
+/** Find the next matching line sequence using progressively looser normalizers. */
 function seekSequence(args: {
   lines: string[];
   pattern: string[];
@@ -438,6 +463,7 @@ function seekSequence(args: {
   return null;
 }
 
+/** Check whether normalized lines match the expected pattern at one start index. */
 function linesMatch(
   lines: string[],
   pattern: string[],
@@ -450,6 +476,7 @@ function linesMatch(
   );
 }
 
+/** Replace smart punctuation and unusual spaces with ASCII equivalents. */
 function normalizePunctuation(value: string): string {
   return Array.from(
     value,
@@ -457,6 +484,7 @@ function normalizePunctuation(value: string): string {
   ).join("");
 }
 
+/** Collapse internal whitespace runs to single spaces for fuzzy matching. */
 function normalizeWhitespace(value: string): string {
   return value.trim().split(/\s+/).join(" ");
 }

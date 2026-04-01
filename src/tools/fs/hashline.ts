@@ -47,6 +47,7 @@ export const HashlineEditSchema = z
 export type HashlineEdit = z.infer<typeof HashlineEditSchema>;
 
 class HashlineReferenceError extends Error {
+  /** Raised when a hashline ref cannot be resolved against the current file text. */
   constructor(message: string) {
     super(message);
     this.name = "HashlineReferenceError";
@@ -64,6 +65,12 @@ const HASHLINE_LINE_RE = new RegExp(
 const NEARBY_HASHLINE_WINDOW = 3;
 const TEXT_ENCODER = new TextEncoder();
 
+/**
+ * Return the visible hash fragment for a line at a specific line number.
+ *
+ * The hash ignores whitespace differences and includes the line number so a
+ * ref identifies both the content and its position in the file.
+ */
 function computeLineHash(lineNumber: number, line: string): string {
   const normalizedLine = line.replace(/\r$/u, "").replace(WHITESPACE_RE, "");
   const payload = TEXT_ENCODER.encode(`${lineNumber}\0${normalizedLine}`);
@@ -73,10 +80,12 @@ function computeLineHash(lineNumber: number, line: string): string {
     .slice(0, VISIBLE_HASH_LENGTH);
 }
 
+/** Render one source line in the `LINE#HASH` ref format. */
 function formatHashlineRef(lineNumber: number, line: string): string {
   return `${lineNumber}#${computeLineHash(lineNumber, line)}`;
 }
 
+/** Convert plain text into hashline-formatted lines for model-facing prompts. */
 export function formatHashlineText(text: string): string {
   return text
     .split(/\r?\n/)
@@ -85,6 +94,13 @@ export function formatHashlineText(text: string): string {
     .join("\n");
 }
 
+/**
+ * Apply a validated batch of hashline edits to plain file text.
+ *
+ * The function resolves all target refs against the original text first,
+ * rejects overlapping replacement ranges, then applies the edits from bottom
+ * to top so earlier replacements do not shift later splice indices.
+ */
 export function editHashline(text: string, edits: HashlineEdit[]): string {
   if (edits.length === 0) {
     return text;
@@ -128,6 +144,7 @@ export function editHashline(text: string, edits: HashlineEdit[]): string {
   return `${lines.join("\n")}${hasTrailingNewline ? "\n" : ""}`;
 }
 
+/** Parse a `LINE#HASH` ref into its 1-based line number and hash fragment. */
 function parseRef(ref: string): [number, string] {
   const match = HASHLINE_REF_RE.exec(ref.trim());
   if (!match?.groups) {
@@ -138,6 +155,7 @@ function parseRef(ref: string): [number, string] {
   return [Number(match.groups.line ?? "0"), match.groups.hash ?? ""];
 }
 
+/** Build a helpful error message for an invalid or stale hashline ref. */
 function buildMismatchMessage(
   ref: string,
   lines: string[],
@@ -164,6 +182,7 @@ function buildMismatchMessage(
   return previews.join("\n");
 }
 
+/** Search nearby lines for a unique hash match when the original ref no longer matches exactly. */
 function findNearbyHashMatch(
   lines: string[],
   expectedHash: string,
@@ -180,6 +199,7 @@ function findNearbyHashMatch(
   return matches.length === 1 ? (matches[0] ?? null) : null;
 }
 
+/** Resolve a hashline ref to its current 1-based line number or raise. */
 function validateRef(ref: string, lines: string[]): number {
   const [lineNumber, expectedHash] = parseRef(ref);
   if (lineNumber < 1 || lineNumber > lines.length) {
@@ -201,6 +221,7 @@ function validateRef(ref: string, lines: string[]): number {
   return lineNumber;
 }
 
+/** Translate a hashline edit into the splice bounds used for list replacement. */
 function editBounds(edit: HashlineEdit, lines: string[]): [number, number] {
   const startLine = validateRef(edit.start_ref, lines);
   if (edit.operation === "insert_before") {
@@ -220,6 +241,7 @@ function editBounds(edit: HashlineEdit, lines: string[]): [number, number] {
   return [startLine - 1, endLine];
 }
 
+/** Reject overlapping replace-range edits before applying them. */
 function ensureNonOverlappingRanges(ranges: Array<[number, number]>): void {
   const occupied = [...ranges]
     .filter(([start, end]) => end > start)
@@ -236,6 +258,7 @@ function ensureNonOverlappingRanges(ranges: Array<[number, number]>): void {
   }
 }
 
+/** Remove a leading `LINE#HASH:` prefix when it matches one of the edit refs. */
 function stripAccidentalRefPrefix(
   line: string,
   validRefs: Set<string>,
@@ -252,6 +275,7 @@ function stripAccidentalRefPrefix(
   return validRefs.has(ref) ? content : line;
 }
 
+/** Sort ranges by start index, then by end index. */
 function sortRanges(left: [number, number], right: [number, number]): number {
   if (left[0] !== right[0]) {
     return left[0] - right[0];
