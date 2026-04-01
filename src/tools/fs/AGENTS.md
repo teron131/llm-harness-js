@@ -11,7 +11,7 @@
 ## High-signal locations
 
 - `src/tools/fs/fs-tools.ts -> SandboxFS/makeFsTools`
-- `src/tools/fs/apply-patch.ts -> parseSingleFilePatchWithStats/applyPatchHunkToText`
+- `src/tools/fs/apply-patch.ts -> parseSingleFilePatchWithStats/applyPatchChunksToText`
 - `src/tools/fs/hashline.ts -> HashlineEditSchema/editHashline/formatHashlineText`
 - `src/tools/fs/fast-copy.ts -> TagRangeSchema/tagContent/filterContent/untagContent`
 
@@ -29,7 +29,7 @@
 
 - `SandboxFS.resolve` enforces path normalization and root containment.
 - `makeFsTools` returns read/write/patch/hashline/`ed` functions for tool-calling workflows.
-- `apply-patch.ts` parses the single-file patch format and applies hunks with tolerant whitespace and punctuation matching.
+- `apply-patch.ts` parses the single-file patch format and applies chunks with tolerant whitespace and punctuation matching.
 - `hashline.ts` renders stable `LINE#HASH` references and validates edits against current file contents.
 - `fastCopy` utilities are pure transforms used by YouTube summarizers.
 
@@ -45,7 +45,7 @@
 
 - `agents/youtube/summarizer*.ts -> import tagContent/filterContent/untagContent`
 - `fs-tools.ts -> makeFsTools -> fsReadText/fsWriteText/fsPatch/fsReadHashline/fsEditHashline/fsEditWithEd`
-- `fs-tools.ts -> SandboxFS.applyPatch -> apply-patch.parseSingleFilePatchWithStats/apply-patch.applyPatchHunkToText`
+- `fs-tools.ts -> SandboxFS.applyPatch -> apply-patch.parseSingleFilePatchWithStats/apply-patch.applyPatchChunksToText`
 - `fs-tools.ts -> SandboxFS.readHashline/editHashline -> hashline.formatHashlineText/hashline.editHashline`
 - `fsTools.ts -> spawn(\"ed\", ...)` for line-oriented edits
 

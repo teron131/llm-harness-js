@@ -25,11 +25,11 @@ export function untagContent(text: string): string {
 
 export function filterContent(taggedText: string, ranges: TagRange[]): string {
   const lines = taggedText.split(/\r?\n/);
-  if (lines.length === 0 || ranges.length === 0) {
+  if (ranges.length === 0) {
     return taggedText;
   }
 
-  const tagToIdx = new Map<string, number>();
+  const tagToIndex = new Map<string, number>();
   for (const [idx, line] of lines.entries()) {
     if (!line.startsWith("[L")) {
       continue;
@@ -37,25 +37,23 @@ export function filterContent(taggedText: string, ranges: TagRange[]): string {
 
     const end = line.indexOf("]");
     if (end !== -1) {
-      tagToIdx.set(line.slice(0, end + 1), idx);
+      tagToIndex.set(line.slice(0, end + 1), idx);
     }
   }
 
-  const keepMask = Array.from({ length: lines.length }, () => true);
+  const keepLineMask = Array.from({ length: lines.length }, () => true);
 
   for (const range of ranges) {
-    const startIdx = tagToIdx.get(range.start_tag);
-    const endIdx = tagToIdx.get(range.end_tag);
+    const startIdx = tagToIndex.get(range.start_tag);
+    const endIdx = tagToIndex.get(range.end_tag);
     if (startIdx === undefined || endIdx === undefined) {
       continue;
     }
 
     const [firstIdx, lastIdx] =
       startIdx <= endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
-    for (let i = firstIdx; i <= lastIdx; i += 1) {
-      keepMask[i] = false;
-    }
+    keepLineMask.fill(false, firstIdx, lastIdx + 1);
   }
 
-  return lines.filter((_, idx) => keepMask[idx]).join("\n");
+  return lines.filter((_, idx) => keepLineMask[idx]).join("\n");
 }

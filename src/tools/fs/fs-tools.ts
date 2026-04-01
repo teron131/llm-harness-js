@@ -7,7 +7,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
 import {
-  applyPatchHunkToText,
+  applyPatchChunksToText,
   parseSingleFilePatchWithStats,
 } from "./apply-patch.js";
 import {
@@ -42,8 +42,6 @@ const EDIT_WITH_ED_SCHEMA = z.object({
   path: z.string(),
   script: z.string(),
 });
-
-type TextTransform = (text: string) => string | Promise<string>;
 
 class SandboxFS {
   readonly rootDir: string;
@@ -81,10 +79,15 @@ class SandboxFS {
 
   async requireFile(path: string): Promise<string> {
     const filePath = this.resolve(path);
-    if (!(await fileExists(filePath))) {
-      throw new Error(`File not found: ${path}`);
+    try {
+      const fileStat = await stat(filePath);
+      if (fileStat.isFile()) {
+        return filePath;
+      }
+    } catch {
+      // Fall through to the not-found error below.
     }
-    return filePath;
+    throw new Error(`File not found: ${path}`);
   }
 
   async readText(path: string): Promise<string> {
@@ -98,13 +101,13 @@ class SandboxFS {
   }
 
   async applyPatch(patch: string): Promise<string> {
-    const [hunk] = parseSingleFilePatchWithStats({ patch_text: patch });
-    const path = normalizeSandboxPath(hunk.path);
+    const [filePatch] = parseSingleFilePatchWithStats({ patch_text: patch });
+    const path = `/${filePatch.path.replace(/^\/+/, "")}`;
     await this.updateExistingText(path, (originalText) =>
-      applyPatchHunkToText({
+      applyPatchChunksToText({
         original_text: originalText,
         file_path: path,
-        hunk,
+        chunks: filePatch.chunks,
       }),
     );
     return `Patched ${path}`;
@@ -122,25 +125,12 @@ class SandboxFS {
 
   private async updateExistingText(
     path: string,
-    transform: TextTransform,
+    transform: (text: string) => string | Promise<string>,
   ): Promise<string> {
     const originalText = await this.readText(path);
     const updatedText = await transform(originalText);
     await this.writeText(path, updatedText);
     return updatedText;
-  }
-}
-
-function normalizeSandboxPath(path: string): string {
-  return `/${path.replace(/^\/+/, "")}`;
-}
-
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    const fileStat = await stat(filePath);
-    return fileStat.isFile();
-  } catch {
-    return false;
   }
 }
 
@@ -177,69 +167,66 @@ async function runEdScript(filePath: string, script: string): Promise<void> {
   });
 }
 
-function makeFsTool<Schema extends z.ZodTypeAny, Output>(
+function createFsTool<Schema extends z.ZodTypeAny, Output>(
   name: string,
   description: string,
   schema: Schema,
   invoke: (input: z.infer<Schema>) => Promise<Output>,
 ) {
-  return tool(
-    async (input: z.infer<Schema>): Promise<Output> => invoke(input),
-    {
-      name,
-      description,
-      schema,
-    },
-  );
+  return tool(invoke, {
+    name,
+    description,
+    schema,
+  });
 }
 
 export function makeFsTools({ rootDir }: { rootDir: string }) {
-  const fs = new SandboxFS(resolve(rootDir));
+  const sandboxFs = new SandboxFS(resolve(rootDir));
 
-  const fsReadText = makeFsTool(
+  const fsReadText = createFsTool(
     "fs_read_text",
     "Read a UTF-8 text file from the sandboxed workspace.",
     READ_TEXT_SCHEMA,
-    ({ path }) => fs.readText(path),
+    ({ path }) => sandboxFs.readText(path),
   );
 
-  const fsWriteText = makeFsTool(
+  const fsWriteText = createFsTool(
     "fs_write_text",
     "Write a UTF-8 text file into the sandboxed workspace.",
     WRITE_TEXT_SCHEMA,
     async ({ path, text }): Promise<string> => {
-      await fs.writeText(path, text);
+      await sandboxFs.writeText(path, text);
       return `Wrote ${path}`;
     },
   );
 
-  const fsPatch = makeFsTool(
+  const fsPatch = createFsTool(
     "fs_patch",
     "Apply a single-file patch to an existing UTF-8 text file.",
     PATCH_SCHEMA,
-    ({ patch }) => fs.applyPatch(patch),
+    ({ patch }) => sandboxFs.applyPatch(patch),
   );
 
-  const fsReadHashline = makeFsTool(
+  const fsReadHashline = createFsTool(
     "fs_read_hashline",
     "Read a UTF-8 text file rendered as `LINE#HASH:content` entries.",
     READ_TEXT_SCHEMA,
-    ({ path }) => fs.readHashline(path),
+    ({ path }) => sandboxFs.readHashline(path),
   );
 
-  const fsEditHashline = makeFsTool(
+  const fsEditHashline = createFsTool(
     "fs_edit_hashline",
     "Apply hashline edits to an existing UTF-8 text file.",
     HASHLINE_EDIT_SCHEMA,
-    ({ path, edits }) => fs.editHashline(path, edits),
+    ({ path, edits }) => sandboxFs.editHashline(path, edits),
   );
 
-  const fsEditWithEd = makeFsTool(
+  const fsEditWithEd = createFsTool(
     "fs_edit_with_ed",
     "Edit a file by running an `ed` script against it.",
     EDIT_WITH_ED_SCHEMA,
     async ({ path, script }): Promise<string> => {
-      const filePath = await fs.requireFile(path);
+      const filePath = await sandboxFs.requireFile(path);
       await runEdScript(filePath, script);
       return `Edited ${path}`;
     },

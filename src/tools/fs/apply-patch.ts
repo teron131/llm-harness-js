@@ -8,7 +8,7 @@ const EOF_MARKER = "*** End of File";
 const CHANGE_CONTEXT_MARKER = "@@ ";
 const EMPTY_CHANGE_CONTEXT_MARKER = "@@";
 
-interface UpdateFileChunk {
+interface PatchChunk {
   change_context: string | null;
   old_lines: string[];
   new_lines: string[];
@@ -17,14 +17,14 @@ interface UpdateFileChunk {
   inserted_lines: number;
 }
 
-interface UpdateFileHunk {
+interface FilePatch {
   path: string;
   move_path: string | null;
-  chunks: UpdateFileChunk[];
+  chunks: PatchChunk[];
 }
 
 interface PatchStats {
-  hunk_count: number;
+  chunk_count: number;
   lines_removed: number;
   lines_inserted: number;
   lines_touched: number;
@@ -36,7 +36,6 @@ type Replacement = [
   replacedLineCount: number,
   newLines: string[],
 ];
-type ReplacementCandidate = [oldLines: string[], newLines: string[]];
 
 const PUNCTUATION_TRANSLATION: Record<string, string> = {
   "\u00a0": " ",
@@ -72,55 +71,72 @@ const PUNCTUATION_TRANSLATION: Record<string, string> = {
 export function parseSingleFilePatchWithStats(args: {
   patch_text: string;
   target_path?: string;
-}): [UpdateFileHunk, PatchStats] {
-  const hunks = parsePatchText(args.patch_text);
-  if (hunks.length === 0) {
+}): [FilePatch, PatchStats] {
+  const filePatches = parsePatchText(args.patch_text);
+  if (filePatches.length === 0) {
     throw new Error("No files were modified.");
   }
-  if (hunks.length !== 1) {
+  if (filePatches.length !== 1) {
     throw new Error("Patch must update exactly one file.");
   }
 
-  const hunk = validateSingleFileHunk(hunks[0]!, args.target_path);
-  return [hunk, collectPatchStats(hunks)];
+  const filePatch = validateSingleFilePatch(filePatches[0]!, args.target_path);
+  return [filePatch, collectPatchStats(filePatches)];
 }
 
-export function applyPatchHunkToText(args: {
+export function applyPatchChunksToText(args: {
   original_text: string;
   file_path: string;
-  hunk: UpdateFileHunk;
+  chunks: PatchChunk[];
 }): string {
-  return applyUpdateChunks({
-    original_text: args.original_text,
-    file_path: args.file_path,
-    chunks: args.hunk.chunks,
-  });
+  const hasTrailingNewline = args.original_text.endsWith("\n");
+  const originalLines = args.original_text.split("\n");
+  if (originalLines.at(-1) === "") {
+    originalLines.pop();
+  }
+
+  const replacements = computeReplacements(
+    originalLines,
+    args.file_path,
+    args.chunks,
+  );
+  const updatedLines = [...originalLines];
+  for (const [startIndex, replacedLineCount, newLines] of replacements
+    .slice()
+    .reverse()) {
+    updatedLines.splice(startIndex, replacedLineCount, ...newLines);
+  }
+
+  if (updatedLines.length === 0) {
+    return "";
+  }
+  return `${updatedLines.join("\n")}${hasTrailingNewline ? "\n" : ""}`;
 }
 
-function validateSingleFileHunk(
-  hunk: UpdateFileHunk,
+function validateSingleFilePatch(
+  filePatch: FilePatch,
   targetPath?: string,
-): UpdateFileHunk {
+): FilePatch {
   if (targetPath !== undefined) {
     const expectedPath = normalizePatchPath(targetPath);
-    const actualPath = normalizePatchPath(hunk.path);
+    const actualPath = normalizePatchPath(filePatch.path);
     if (actualPath !== expectedPath) {
       throw new Error(
-        `Patch targets ${JSON.stringify(hunk.path)}, expected ${JSON.stringify(targetPath)}.`,
+        `Patch targets ${JSON.stringify(filePatch.path)}, expected ${JSON.stringify(targetPath)}.`,
       );
     }
   }
-  if (hunk.move_path !== null) {
+  if (filePatch.move_path !== null) {
     throw new Error("Move operations are not supported.");
   }
-  return hunk;
+  return filePatch;
 }
 
 function normalizePatchPath(path: string): string {
   return path.replace(/^\/+/, "");
 }
 
-function parsePatchText(patchText: string): UpdateFileHunk[] {
+function parsePatchText(patchText: string): FilePatch[] {
   const stripped = patchText.trim();
   if (!stripped) {
     throw new Error("Patch input is empty.");
@@ -134,7 +150,7 @@ function parsePatchText(patchText: string): UpdateFileHunk[] {
     throw new Error("The last line of the patch must be '*** End Patch'.");
   }
 
-  const hunks: UpdateFileHunk[] = [];
+  const filePatches: FilePatch[] = [];
   let index = 1;
   while (index < lines.length - 1) {
     const line = lines[index]?.trim() ?? "";
@@ -144,7 +160,7 @@ function parsePatchText(patchText: string): UpdateFileHunk[] {
     }
     if (!line.startsWith(UPDATE_FILE_MARKER)) {
       throw new Error(
-        `Unsupported patch hunk header: ${JSON.stringify(lines[index])}`,
+        `Unsupported patch header: ${JSON.stringify(lines[index])}`,
       );
     }
 
@@ -158,8 +174,8 @@ function parsePatchText(patchText: string): UpdateFileHunk[] {
       index += 1;
     }
 
-    const chunks: UpdateFileChunk[] = [];
-    let allowMissingContext = true;
+    const chunks: PatchChunk[] = [];
+    let allowMissingContextMarker = true;
     while (index < lines.length - 1) {
       const current = lines[index] ?? "";
       const strippedCurrent = current.trim();
@@ -171,30 +187,32 @@ function parsePatchText(patchText: string): UpdateFileHunk[] {
         break;
       }
 
-      const [chunk, consumed] = parseUpdateChunk(
+      const [chunk, consumed] = parsePatchChunk(
         lines.slice(index, lines.length - 1),
-        allowMissingContext,
+        allowMissingContextMarker,
       );
       chunks.push(chunk);
-      allowMissingContext = false;
+      allowMissingContextMarker = false;
       index += consumed;
     }
 
     if (chunks.length === 0) {
-      throw new Error(`Update file hunk for ${JSON.stringify(path)} is empty.`);
+      throw new Error(
+        `Update file patch for ${JSON.stringify(path)} is empty.`,
+      );
     }
-    hunks.push({ path, move_path: movePath, chunks });
+    filePatches.push({ path, move_path: movePath, chunks });
   }
 
-  return hunks;
+  return filePatches;
 }
 
-function parseUpdateChunk(
+function parsePatchChunk(
   lines: string[],
-  allowMissingContext: boolean,
-): [UpdateFileChunk, number] {
+  allowMissingContextMarker: boolean,
+): [PatchChunk, number] {
   if (lines.length === 0) {
-    throw new Error("Update hunk does not contain any lines.");
+    throw new Error("Patch chunk does not contain any lines.");
   }
 
   let index = 0;
@@ -205,9 +223,9 @@ function parseUpdateChunk(
   } else if (first.startsWith(CHANGE_CONTEXT_MARKER)) {
     changeContext = first.slice(CHANGE_CONTEXT_MARKER.length);
     index += 1;
-  } else if (!allowMissingContext) {
+  } else if (!allowMissingContextMarker) {
     throw new Error(
-      `Expected update hunk to start with @@ context marker, got ${JSON.stringify(first)}.`,
+      `Expected patch chunk to start with @@ context marker, got ${JSON.stringify(first)}.`,
     );
   }
 
@@ -252,7 +270,7 @@ function parseUpdateChunk(
   }
 
   if (changeCount === 0) {
-    throw new Error("Update hunk has no change lines.");
+    throw new Error("Patch chunk has no change lines.");
   }
 
   return [
@@ -268,21 +286,21 @@ function parseUpdateChunk(
   ];
 }
 
-function collectPatchStats(hunks: UpdateFileHunk[]): PatchStats {
-  let hunkCount = 0;
+function collectPatchStats(filePatches: FilePatch[]): PatchStats {
+  let chunkCount = 0;
   let linesRemoved = 0;
   let linesInserted = 0;
 
-  for (const hunk of hunks) {
-    hunkCount += hunk.chunks.length;
-    for (const chunk of hunk.chunks) {
+  for (const filePatch of filePatches) {
+    chunkCount += filePatch.chunks.length;
+    for (const chunk of filePatch.chunks) {
       linesRemoved += chunk.removed_lines;
       linesInserted += chunk.inserted_lines;
     }
   }
 
   return {
-    hunk_count: hunkCount,
+    chunk_count: chunkCount,
     lines_removed: linesRemoved,
     lines_inserted: linesInserted,
     lines_touched: linesRemoved + linesInserted,
@@ -298,33 +316,10 @@ function isChunkBoundary(line: string): boolean {
   );
 }
 
-function applyUpdateChunks(args: {
-  original_text: string;
-  file_path: string;
-  chunks: UpdateFileChunk[];
-}): string {
-  const hasTrailingNewline = args.original_text.endsWith("\n");
-  const originalLines = args.original_text.split("\n");
-  if (originalLines.at(-1) === "") {
-    originalLines.pop();
-  }
-
-  const replacements = computeReplacements(
-    originalLines,
-    args.file_path,
-    args.chunks,
-  );
-  const newLines = applyReplacements(originalLines, replacements);
-  if (newLines.length === 0) {
-    return "";
-  }
-  return `${newLines.join("\n")}${hasTrailingNewline ? "\n" : ""}`;
-}
-
 function computeReplacements(
   originalLines: string[],
   filePath: string,
-  chunks: UpdateFileChunk[],
+  chunks: PatchChunk[],
 ): Replacement[] {
   const replacements: Replacement[] = [];
   let searchStart = 0;
@@ -376,57 +371,40 @@ function advanceToChunkContext(
 function findChunkReplacement(
   lines: string[],
   filePath: string,
-  chunk: UpdateFileChunk,
+  chunk: PatchChunk,
   start: number,
 ): Replacement {
   if (chunk.old_lines.length === 0) {
     return [lines.length, 0, chunk.new_lines];
   }
 
-  const candidatePatterns = getChunkMatchPatterns(chunk);
-  for (const [oldLines, newLines] of candidatePatterns) {
-    const matchIndex = seekSequence({
+  let oldLines = chunk.old_lines;
+  let newLines = chunk.new_lines;
+  let matchIndex = seekSequence({
+    lines,
+    pattern: oldLines,
+    start,
+    eof: chunk.is_end_of_file,
+  });
+  if (matchIndex === null && oldLines.at(-1) === "") {
+    oldLines = oldLines.slice(0, -1);
+    if (newLines.at(-1) === "") {
+      newLines = newLines.slice(0, -1);
+    }
+    matchIndex = seekSequence({
       lines,
       pattern: oldLines,
       start,
       eof: chunk.is_end_of_file,
     });
-    if (matchIndex !== null) {
-      return [matchIndex, oldLines.length, newLines];
-    }
   }
 
+  if (matchIndex !== null) {
+    return [matchIndex, oldLines.length, newLines];
+  }
   throw new Error(
     `Failed to find expected lines in ${filePath}:\n${chunk.old_lines.join("\n")}`,
   );
-}
-
-function getChunkMatchPatterns(chunk: UpdateFileChunk): ReplacementCandidate[] {
-  const patterns: ReplacementCandidate[] = [[chunk.old_lines, chunk.new_lines]];
-  if (chunk.old_lines.at(-1) !== "") {
-    return patterns;
-  }
-
-  const trimmedOldLines = chunk.old_lines.slice(0, -1);
-  const trimmedNewLines =
-    chunk.new_lines.at(-1) === ""
-      ? chunk.new_lines.slice(0, -1)
-      : chunk.new_lines;
-  patterns.push([trimmedOldLines, trimmedNewLines]);
-  return patterns;
-}
-
-function applyReplacements(
-  lines: string[],
-  replacements: Replacement[],
-): string[] {
-  const result = [...lines];
-  for (const [startIndex, replacedLineCount, newLines] of [
-    ...replacements,
-  ].reverse()) {
-    result.splice(startIndex, replacedLineCount, ...newLines);
-  }
-  return result;
 }
 
 function seekSequence(args: {

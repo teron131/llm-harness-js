@@ -90,7 +90,11 @@ export function editHashline(text: string, edits: HashlineEdit[]): string {
     return text;
   }
 
-  const [lines, hasTrailingNewline] = splitTextLines(text);
+  const hasTrailingNewline = text.endsWith("\n");
+  const lines = text.split("\n");
+  if (lines.at(-1) === "") {
+    lines.pop();
+  }
   const replacements: Array<[number, number, string[]]> = [];
   const replaceRanges: Array<[number, number]> = [];
 
@@ -131,22 +135,7 @@ function parseRef(ref: string): [number, string] {
       `Invalid hashline ref: ${JSON.stringify(ref)}`,
     );
   }
-  const hash = match.groups.hash;
-  if (!hash) {
-    throw new HashlineReferenceError(
-      `Invalid hashline ref: ${JSON.stringify(ref)}`,
-    );
-  }
-  return [Number(match.groups.line ?? "0"), hash];
-}
-
-function splitTextLines(text: string): [string[], boolean] {
-  const hasTrailingNewline = text.endsWith("\n");
-  const lines = text.split("\n");
-  if (lines.at(-1) === "") {
-    lines.pop();
-  }
-  return [lines, hasTrailingNewline];
+  return [Number(match.groups.line ?? "0"), match.groups.hash ?? ""];
 }
 
 function buildMismatchMessage(
