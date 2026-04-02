@@ -10,7 +10,7 @@
 
 ## High-signal locations
 
-- `src/agents/youtube/index.ts -> summarizeVideo/streamSummarizeVideo/summarizeVideoReact/youtubeLoader`
+- `src/agents/youtube/index.ts -> summarizeVideo/streamSummarizeVideo/summarizeVideoReact`
 - `src/agents/youtube/summarizerLite.ts -> lightweight summarize flow`
 - `src/agents/youtube/summarizer.ts -> graph-based summarize + quality loop`
 - `src/agents/youtube/summarizerGemini.ts -> direct Gemini multimodal summarize`
@@ -48,7 +48,7 @@
 - `summarizer.ts -> StateGraph + garbage_filter -> summary -> quality`
 - `summarizerGemini.ts -> GoogleGenAI + trackUsage`
 - `schemas.ts -> TagRangeSchema + s2hk conversion`
-- `index.ts -> delegates to summarizer modules`
+- `index.ts -> delegates to summarizer modules and re-exports youtubeLoader from tools/youtube`
 
 ## General approach (not rigid checklist)
 

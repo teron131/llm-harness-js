@@ -1,12 +1,7 @@
 /** Agent exports. */
 
 import { webloaderTool } from "../tools/web/index.js";
-import { youtubeLoader } from "./youtube/index.js";
-/** Return the YouTube loader tool for the agent stack. */
-
-export function youtubeloaderTool(url: string): Promise<string> {
-  return youtubeLoader(url);
-}
+import { youtubeloaderTool } from "../tools/youtube/index.js";
 /** Return the configured tool set for the agent stack. */
 
 export function getTools() {
@@ -14,6 +9,7 @@ export function getTools() {
 }
 
 export { webloader, webloaderTool } from "../tools/web/index.js";
+export { youtubeLoader, youtubeloaderTool } from "../tools/youtube/index.js";
 export {
   BaseHarnessAgent,
   ExaAgent,
@@ -25,4 +21,3 @@ export {
   YouTubeSummarizerGemini,
   YouTubeSummarizerReAct,
 } from "./agents.js";
-export { youtubeLoader } from "./youtube/index.js";

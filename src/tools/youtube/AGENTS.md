@@ -10,7 +10,7 @@
 
 ## High-signal locations
 
-- `src/tools/youtube/scraper.ts -> scrapeYoutube/getTranscript/formatYoutubeLoaderOutput`
+- `src/tools/youtube/scraper.ts -> scrapeYoutube/getTranscript/youtubeLoader/youtubeloaderTool`
 - `src/tools/youtube/index.ts -> re-export surface`
 
 ## Repository snapshot
@@ -28,7 +28,8 @@
 - `scrapeYoutube` validates URL, normalizes it, then tries providers in fixed order.
 - `_fetch_scrape_creators` equivalent runs first; Supadata fallback runs second.
 - `getTranscript` enforces strict transcript availability and non-empty output.
-- `formatYoutubeLoaderOutput` converts normalized result into a readable block used by agent APIs.
+- `youtubeLoader` and `youtubeloaderTool` expose the agent-facing loader boundary from `tools/`.
+- `formatYoutubeLoaderOutput` converts normalized result into a readable block used by loader APIs.
 
 ## Project-specific conventions and rationale
 
@@ -39,7 +40,7 @@
 ## Syntax Relationships
 
 - `scraper.ts -> imports cleanText/cleanYoutubeUrl/extractVideoId/isYoutubeUrl`
-- `agents/youtube/index.ts -> youtubeLoader uses scrapeYoutube + formatYoutubeLoaderOutput`
+- `agents/index.ts -> getTools() includes youtubeloaderTool from tools/youtube`
 - `agents/youtube/summarizer*.ts -> getTranscript for transcript source`
 
 ## General approach (not rigid checklist)

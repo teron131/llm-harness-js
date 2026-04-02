@@ -30,7 +30,7 @@
 - `WebSearchAgent`, `WebLoaderAgent`, and `WebSearchLoaderAgent` vary capabilities via constructor options and tool usage.
 - `ImageAnalysisAgent` routes media content through `MediaMessage`.
 - YouTube summarizer classes delegate to `agents/youtube/*` modules.
-- `agents/index.ts` owns default tool registry (`webloaderTool`, `youtubeloaderTool`).
+- `agents/index.ts` assembles the default tool registry from `tools/*`.
 
 ## Project-specific conventions and rationale
 
@@ -43,7 +43,7 @@
 - `agents.ts -> import ChatOpenRouter from clients/openrouter.ts`
 - `agents.ts -> import MediaMessage from clients/multimodal.ts`
 - `agents.ts -> import summarizeVideo* from agents/youtube/*`
-- `index.ts -> getTools() returns webloaderTool + youtubeloaderTool`
+- `index.ts -> getTools() returns webloaderTool + youtubeloaderTool from tools/*`
 
 ## General approach (not rigid checklist)
 

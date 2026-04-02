@@ -8,4 +8,9 @@ export {
   untagContent,
 } from "./fs/index.js";
 export { webloader, webloaderTool } from "./web/index.js";
-export { getTranscript, scrapeYoutube } from "./youtube/index.js";
+export {
+  getTranscript,
+  scrapeYoutube,
+  youtubeLoader,
+  youtubeloaderTool,
+} from "./youtube/index.js";

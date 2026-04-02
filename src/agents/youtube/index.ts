@@ -1,9 +1,5 @@
 /** YouTube summarization agent exports. */
 
-import {
-  formatYoutubeLoaderOutput,
-  scrapeYoutube,
-} from "../../tools/youtube/scraper.js";
 import type { Summary } from "./schemas.js";
 /** Summarize a YouTube video or transcript. */
 
@@ -41,9 +37,5 @@ export async function summarizeVideoReact(
     ...(targetLanguage !== undefined ? { targetLanguage } : {}),
   });
 }
-/** Helper for youtube loader. */
 
-export async function youtubeLoader(url: string): Promise<string> {
-  const result = await scrapeYoutube(url);
-  return formatYoutubeLoaderOutput(result);
-}
+export { youtubeLoader } from "../../tools/youtube/index.js";

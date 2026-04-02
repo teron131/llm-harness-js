@@ -1,5 +1,6 @@
 /** YouTube transcript scraping helpers. */
 
+import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
 import {
@@ -282,3 +283,20 @@ export function formatYoutubeLoaderOutput(
 
   return outputParts.join("\n");
 }
+/** Load YouTube metadata and transcript as a single text block. */
+
+export async function youtubeLoader(url: string): Promise<string> {
+  const result = await scrapeYoutube(url);
+  return formatYoutubeLoaderOutput(result);
+}
+
+export const youtubeloaderTool = tool(
+  async ({ url }: { url: string }): Promise<string> => youtubeLoader(url),
+  {
+    name: "youtubeloader_tool",
+    description: "Load YouTube metadata and transcript from a video URL.",
+    schema: z.object({
+      url: z.string(),
+    }),
+  },
+);

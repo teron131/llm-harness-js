@@ -1,3 +1,8 @@
 /** YouTube scraping helpers. */
 
-export { getTranscript, scrapeYoutube } from "./scraper.js";
+export {
+  getTranscript,
+  scrapeYoutube,
+  youtubeLoader,
+  youtubeloaderTool,
+} from "./scraper.js";

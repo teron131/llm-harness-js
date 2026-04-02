@@ -22,11 +22,6 @@ import {
 
 const DEFAULT_MODEL = "google/gemini-3-flash-preview";
 const FAST_MODEL = "google/gemini-2.5-flash-lite-preview-09-2025";
-/** Scrape a YouTube video transcript. */
-
-function scrapeYoutube(youtubeUrl: string): Promise<string> {
-  return getTranscript(youtubeUrl);
-}
 /** Helper for garbage filter transcript. */
 
 async function garbageFilterTranscript(transcript: string): Promise<string> {
@@ -64,7 +59,7 @@ export async function summarizeVideo({
   }).withStructuredOutput(SummarySchema);
 
   const transcript = isYoutubeUrl(transcriptOrUrl)
-    ? await scrapeYoutube(transcriptOrUrl)
+    ? await getTranscript(transcriptOrUrl)
     : transcriptOrUrl;
   const cleanedTranscript = await garbageFilterTranscript(transcript);
 
