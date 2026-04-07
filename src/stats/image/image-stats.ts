@@ -2,69 +2,69 @@
 
 /** Public image stats API: cache list payloads, rebuild from live sources when needed, and return failure-safe output. */
 import {
-  currentEpochSeconds,
-  DEFAULT_OUTPUT_PATH,
-  loadImageStatsSelectedFromCache,
-  saveImageStatsSelectedToPath,
+	currentEpochSeconds,
+	DEFAULT_OUTPUT_PATH,
+	loadImageStatsSelectedFromCache,
+	saveImageStatsSelectedToPath,
 } from "./image-stats/cache";
 import { buildFinalModels } from "./image-stats/final-stage";
 import { buildMatchedRows } from "./image-stats/match-stage";
 import { fetchSourceData } from "./image-stats/source-stage";
-import {
-  type ImageStatsSelectedModel,
-  type ImageStatsSelectedOptions,
-  type ImageStatsSelectedPayload,
+import type {
+	ImageStatsSelectedModel,
+	ImageStatsSelectedOptions,
+	ImageStatsSelectedPayload,
 } from "./image-stats/types";
 
 export type {
-  ImageStatsSelectedModel,
-  ImageStatsSelectedOptions,
-  ImageStatsSelectedPayload,
+	ImageStatsSelectedModel,
+	ImageStatsSelectedOptions,
+	ImageStatsSelectedPayload,
 };
 /** Save the selected Stats pipeline payload. */
 
 export async function saveImageStatsSelected(
-  payload: ImageStatsSelectedPayload,
-  outputPath = DEFAULT_OUTPUT_PATH,
+	payload: ImageStatsSelectedPayload,
+	outputPath = DEFAULT_OUTPUT_PATH,
 ): Promise<void> {
-  await saveImageStatsSelectedToPath(payload, outputPath);
+	await saveImageStatsSelectedToPath(payload, outputPath);
 }
 /** Return the selected Stats pipeline payload. */
 
 export async function getImageStatsSelected(
-  options: ImageStatsSelectedOptions = {},
+	options: ImageStatsSelectedOptions = {},
 ): Promise<ImageStatsSelectedPayload> {
-  try {
-    if (options.id == null) {
-      const cachedPayload =
-        await loadImageStatsSelectedFromCache(DEFAULT_OUTPUT_PATH);
-      if (cachedPayload) {
-        return cachedPayload;
-      }
-    }
+	try {
+		if (options.id == null) {
+			const cachedPayload =
+				await loadImageStatsSelectedFromCache(DEFAULT_OUTPUT_PATH);
+			if (cachedPayload) {
+				return cachedPayload;
+			}
+		}
 
-    const sourceData = await fetchSourceData();
-    const matchedRows = await buildMatchedRows(sourceData);
-    const models = buildFinalModels(matchedRows, options.id);
-    const fetchedAt = currentEpochSeconds();
+		const sourceData = await fetchSourceData();
+		const matchedRows = await buildMatchedRows(sourceData);
+		const models = buildFinalModels(matchedRows, options.id);
+		const fetchedAt = currentEpochSeconds();
 
-    if (options.id != null) {
-      return {
-        fetched_at_epoch_seconds: fetchedAt,
-        models,
-      };
-    }
+		if (options.id != null) {
+			return {
+				fetched_at_epoch_seconds: fetchedAt,
+				models,
+			};
+		}
 
-    const listPayload: ImageStatsSelectedPayload = {
-      fetched_at_epoch_seconds: fetchedAt,
-      models,
-    };
-    await saveImageStatsSelected(listPayload, DEFAULT_OUTPUT_PATH);
-    return listPayload;
-  } catch {
-    return {
-      fetched_at_epoch_seconds: null,
-      models: [],
-    };
-  }
+		const listPayload: ImageStatsSelectedPayload = {
+			fetched_at_epoch_seconds: fetchedAt,
+			models,
+		};
+		await saveImageStatsSelected(listPayload, DEFAULT_OUTPUT_PATH);
+		return listPayload;
+	} catch {
+		return {
+			fetched_at_epoch_seconds: null,
+			models: [],
+		};
+	}
 }
