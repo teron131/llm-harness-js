@@ -40,9 +40,9 @@ export function getContentBlocks(
 	const blocks = value.content_blocks;
 	return Array.isArray(blocks) ? (blocks as Record<string, unknown>[]) : [];
 }
-/** Extract the open router reasoning details. */
+/** Extract provider-specific reasoning details from a streamed chunk. */
 
-function extractOpenRouterReasoningDetails(
+function extractReasoningDetails(
 	chunk: Record<string, unknown>,
 ): string {
 	const details = chunk.reasoning_details;
@@ -78,7 +78,7 @@ function extractOpenRouterReasoningDetails(
 		return "";
 	}
 
-	// OpenRouter can return cumulative reasoning deltas in one chunk.
+	// Some OpenAI-compatible providers return cumulative reasoning deltas.
 	return detailParts.at(-1) ?? "";
 }
 /** Extract the additional kwargs reasoning. */
@@ -114,7 +114,7 @@ function extractAdditionalKwargsReasoning(
 export function extractReasoningDeltaFromChunk(
 	chunk: Record<string, unknown>,
 ): string | null {
-	const detailReasoning = extractOpenRouterReasoningDetails(chunk);
+	const detailReasoning = extractReasoningDetails(chunk);
 	if (detailReasoning) {
 		return detailReasoning;
 	}

@@ -15,8 +15,6 @@ export {
 	ExaAgent,
 	ImageAnalysisAgent,
 	WebLoaderAgent,
-	WebSearchAgent,
-	WebSearchLoaderAgent,
 	YouTubeSummarizer,
 	YouTubeSummarizerGemini,
 	YouTubeSummarizerReAct,

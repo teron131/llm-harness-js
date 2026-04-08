@@ -38,7 +38,7 @@
 ## Syntax Relationships
 
 - `agents/index.ts -> getTools() includes webloaderTool`
-- `agents/agents.ts -> WebLoaderAgent/WebSearchLoaderAgent use webloaderTool`
+- `agents/agents.ts -> WebLoaderAgent uses webloaderTool`
 
 ## General approach (not rigid checklist)
 

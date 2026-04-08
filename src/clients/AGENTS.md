@@ -10,7 +10,7 @@
 
 ## High-signal locations
 
-- `src/clients/openrouter.ts -> ChatOpenRouter/OpenRouterEmbeddings`
+- `src/clients/openai.ts -> ChatOpenAI/OpenAIEmbeddings`
 - `src/clients/gemini.ts -> ChatGemini/GeminiEmbeddings/createGeminiCache`
 - `src/clients/multimodal.ts -> MediaMessage`
 - `src/clients/parser.ts -> parseInvoke/parseBatch/parseStream/getMetadata`
@@ -29,7 +29,7 @@
 
 ## Key takeaways per location
 
-- `openrouter.ts` applies routing/plugin/provider defaults and model-format validation.
+- `openai.ts` applies OpenAI-compatible API key/base URL defaults and chat reasoning options.
 - `gemini.ts` resolves key env vars and wraps cache upload/polling behavior.
 - `multimodal.ts` converts local bytes/files into OpenAI-style content blocks.
 - `parser.ts` unifies output/usage extraction across provider response shapes.
@@ -37,13 +37,14 @@
 
 ## Project-specific conventions and rationale
 
-- Keep env var names stable (`OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`).
+- Keep env var names stable (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`).
+- Keep runtime wiring on `openai.ts` after upstream merges; do not reintroduce `@langchain/openrouter` or OpenRouter-only plugin paths.
 - Preserve parser fallback order to avoid provider-specific regressions.
 - Keep provider-specific request logic inside client modules, not agent modules.
 
 ## Syntax Relationships
 
-- `openrouter.ts -> import NativeChatOpenRouter from @langchain/openrouter`
+- `openai.ts -> import NativeChatOpenAI/OpenAIEmbeddings from @langchain/openai`
 - `gemini.ts -> import GoogleGenAI + ChatGoogleGenerativeAI`
 - `multimodal.ts -> MediaMessage used by agents/ImageAnalysisAgent`
 - `parser.ts -> streamed chunk parsing path + optional reasoning extraction`
@@ -51,7 +52,7 @@
 
 ## General approach (not rigid checklist)
 
-- Add new provider adapters as sibling modules and re-export via `clients/index.ts`.
+- Keep OpenAI-compatible and Gemini adapters as sibling modules and re-export via `clients/index.ts`.
 - Keep schemas/outputs normalized before exposing to agents.
 - Treat `usage.ts` as the only source of truth for accumulated costs/tokens.
 

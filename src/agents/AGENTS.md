@@ -27,20 +27,20 @@
 ## Key takeaways per location
 
 - `BaseHarnessAgent` is the core path for model setup and response handling.
-- `WebSearchAgent`, `WebLoaderAgent`, and `WebSearchLoaderAgent` vary capabilities via constructor options and tool usage.
+- `WebLoaderAgent` adds the web loader tool while `BaseHarnessAgent` remains the generic chat path.
 - `ImageAnalysisAgent` routes media content through `MediaMessage`.
 - YouTube summarizer classes delegate to `agents/youtube/*` modules.
 - `agents/index.ts` assembles the default tool registry from `tools/*`.
 
 ## Project-specific conventions and rationale
 
-- Keep agent constructors lightweight and pass provider details through `clients/openrouter.ts`.
+- Keep agent constructors lightweight and pass provider details through `clients/openai.ts`.
 - Preserve class names aligned with Python equivalents (`YouTubeSummarizer`, `YouTubeSummarizerReAct`, `YouTubeSummarizerGemini`), with aliases acceptable.
 - Keep orchestration logic in `agents`, not in `utils` or `tools`.
 
 ## Syntax Relationships
 
-- `agents.ts -> import ChatOpenRouter from clients/openrouter.ts`
+- `agents.ts -> import ChatOpenAI from clients/openai.ts`
 - `agents.ts -> import MediaMessage from clients/multimodal.ts`
 - `agents.ts -> import summarizeVideo* from agents/youtube/*`
 - `index.ts -> getTools() returns webloaderTool + youtubeloaderTool from tools/*`

@@ -37,6 +37,7 @@
 ## Project-specific conventions and rationale
 
 - Preserve model defaults and env var names to maintain Python parity.
+- Keep runtime provider wiring on `src/clients/openai.ts` with `OPENAI_API_KEY` and `OPENAI_BASE_URL`; do not reintroduce `@langchain/openrouter` during upstream merges.
 - Keep naming idiomatic in TS (`camelCase`) while retaining behavior contracts from Python.
 - Keep provider-specific request shaping in `clients/*`, not in agents.
 - Keep external API calls isolated to `tools/*`.
@@ -44,9 +45,9 @@
 ## Syntax Relationships
 
 - `src/index.ts -> export * from agents/clients/tools/utils`
-- `src/agents/agents.ts -> ChatOpenRouter + MediaMessage + webloaderTool`
+- `src/agents/agents.ts -> ChatOpenAI + MediaMessage + webloaderTool`
 - `src/agents/youtube/summarizer*.ts -> tools/youtube/scraper + tools/fs/fastCopy + prompts/schemas`
-- `src/clients/openrouter.ts -> @langchain/openrouter + @langchain/openai`
+- `src/clients/openai.ts -> @langchain/openai`
 - `src/clients/gemini.ts -> @google/genai + @langchain/google-genai`
 - `src/tools/youtube/scraper.ts -> utils/youtubeUtils.ts`
 

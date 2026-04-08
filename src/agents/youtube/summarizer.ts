@@ -2,7 +2,7 @@
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import { ChatOpenRouter } from "../../clients/openrouter.js";
+import { ChatOpenAI } from "../../clients/openai.js";
 import {
 	filterContent,
 	tagContent,
@@ -27,7 +27,7 @@ const FAST_MODEL = "google/gemini-2.5-flash-lite-preview-09-2025";
 async function garbageFilterTranscript(transcript: string): Promise<string> {
 	const taggedTranscript = tagContent(transcript);
 
-	const llm = ChatOpenRouter({
+	const llm = ChatOpenAI({
 		model: FAST_MODEL,
 		temperature: 0,
 	}).withStructuredOutput(GarbageIdentificationSchema);
@@ -52,7 +52,7 @@ export async function summarizeVideo({
 	transcriptOrUrl: string;
 	targetLanguage?: string | null;
 }): Promise<Summary> {
-	const llm = ChatOpenRouter({
+	const llm = ChatOpenAI({
 		model: DEFAULT_MODEL,
 		temperature: 0,
 		reasoningEffort: "medium",

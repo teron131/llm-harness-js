@@ -29,13 +29,13 @@
   - `agents/agents.ts -> BaseHarnessAgent`, web/image agents, YouTube summarizer wrappers
   - `agents/youtube/summarizer*.ts -> summarization graph + quality/garbage analysis nodes`
 - Notable clients/tools:
-  - `clients/openrouter.ts`, `clients/gemini.ts`, `clients/multimodal.ts`, `clients/usage.ts`
+  - `clients/openai.ts`, `clients/gemini.ts`, `clients/multimodal.ts`, `clients/usage.ts`
   - `tools/youtube/scraper.ts`, `tools/web/webloader.ts`, `tools/fs/fastCopy.ts`
 
 ## Syntax Relationships
 
 - `src/index.ts -> exports from ./agents/index.js`, `./clients/index.js`, `./tools/index.js`, `./utils/index.js`
-- `agents/agents.ts -> imports ChatOpenRouter (clients/openrouter.ts) + MediaMessage (clients/multimodal.ts)`
+- `agents/agents.ts -> imports ChatOpenAI (clients/openai.ts) + MediaMessage (clients/multimodal.ts)`
 - `agents/youtube/summarizer*.ts -> imports prompts/schemas + youtube scraper + fs copy helper`
 - `tools/youtube/scraper.ts -> depends on utils/youtubeUtils.ts` for URL parsing and normalization
 - `tools/*` and `clients/*` are dependencies of `agents/*`; `utils/*` are shared low-level helpers

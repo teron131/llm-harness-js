@@ -6,7 +6,7 @@ import { createAgent } from "langchain";
 import type { ZodTypeAny, z } from "zod";
 
 import { MediaMessage } from "../clients/multimodal.js";
-import { ChatOpenRouter } from "../clients/openrouter.js";
+import { ChatOpenAI } from "../clients/openai.js";
 import { webloaderTool } from "../tools/web/webloader.js";
 import type { Summary } from "./youtube/schemas.js";
 import { summarizeVideo as summarizeVideoLite } from "./youtube/summarizer.js";
@@ -75,7 +75,7 @@ export class BaseHarnessAgent<T extends ZodTypeAny | null = null> {
 			);
 		}
 
-		this.model = ChatOpenRouter({
+		this.model = ChatOpenAI({
 			model: modelName,
 			temperature,
 			reasoningEffort,
@@ -123,34 +123,6 @@ export class BaseHarnessAgent<T extends ZodTypeAny | null = null> {
 		return (content ?? "") as AgentOutput<T>;
 	}
 }
-/** Web Search Agent for Agent model orchestration. */
-
-export class WebSearchAgent<
-	T extends ZodTypeAny | null = null,
-> extends BaseHarnessAgent<T> {
-	constructor({
-		webSearchEngine,
-		webSearchMaxResults = 5,
-		...args
-	}: {
-		webSearchEngine?: "native" | "exa";
-		webSearchMaxResults?: number;
-	} & Record<string, unknown> = {}) {
-		super({
-			...args,
-			webSearch: true,
-			webSearchEngine,
-			webSearchMaxResults,
-		});
-	}
-
-	async invoke(userInput: string): Promise<AgentOutput<T>> {
-		const response = (await this.agent.invoke({
-			messages: [{ role: "user", content: userInput }],
-		} as any)) as AgentResponse<T>;
-		return this.processResponse(response);
-	}
-}
 /** Web Loader Agent for Agent model orchestration. */
 
 export class WebLoaderAgent<
@@ -160,35 +132,6 @@ export class WebLoaderAgent<
 		super({
 			...args,
 			tools: [webloaderTool],
-		});
-	}
-
-	async invoke(userInput: string): Promise<AgentOutput<T>> {
-		const response = (await this.agent.invoke({
-			messages: [{ role: "user", content: userInput }],
-		} as any)) as AgentResponse<T>;
-		return this.processResponse(response);
-	}
-}
-/** Web Search Loader Agent for Agent model orchestration. */
-
-export class WebSearchLoaderAgent<
-	T extends ZodTypeAny | null = null,
-> extends BaseHarnessAgent<T> {
-	constructor({
-		webSearchEngine,
-		webSearchMaxResults = 5,
-		...args
-	}: {
-		webSearchEngine?: "native" | "exa";
-		webSearchMaxResults?: number;
-	} & Record<string, unknown> = {}) {
-		super({
-			...args,
-			tools: [webloaderTool],
-			webSearch: true,
-			webSearchEngine,
-			webSearchMaxResults,
 		});
 	}
 

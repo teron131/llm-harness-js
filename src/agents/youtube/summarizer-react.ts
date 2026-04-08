@@ -3,7 +3,7 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 
-import { ChatOpenRouter } from "../../clients/openrouter.js";
+import { ChatOpenAI } from "../../clients/openai.js";
 import {
 	filterContent,
 	tagContent,
@@ -50,7 +50,7 @@ async function garbageFilterNode(state: SummarizerStateType) {
 	}
 
 	const taggedTranscript = tagContent(state.transcript);
-	const llm = ChatOpenRouter({
+	const llm = ChatOpenAI({
 		model: FAST_MODEL,
 		temperature: 0,
 		reasoningEffort: "low",
@@ -70,7 +70,7 @@ async function garbageFilterNode(state: SummarizerStateType) {
 /** Helper for summary node. */
 
 async function summaryNode(state: SummarizerStateType) {
-	const llm = ChatOpenRouter({
+	const llm = ChatOpenAI({
 		model: SUMMARY_MODEL,
 		temperature: 0,
 		reasoningEffort: "medium",
@@ -91,7 +91,7 @@ async function summaryNode(state: SummarizerStateType) {
 /** Helper for quality node. */
 
 async function qualityNode(state: SummarizerStateType) {
-	const llm = ChatOpenRouter({
+	const llm = ChatOpenAI({
 		model: QUALITY_MODEL,
 		temperature: 0,
 		reasoningEffort: "low",

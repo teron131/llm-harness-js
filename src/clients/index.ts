@@ -5,15 +5,13 @@ export {
 	ExaAgent,
 	ImageAnalysisAgent,
 	WebLoaderAgent,
-	WebSearchAgent,
-	WebSearchLoaderAgent,
 	YouTubeSummarizer,
 	YouTubeSummarizerGemini,
 	YouTubeSummarizerReAct,
 } from "../agents/agents.js";
 export { ChatGemini, createGeminiCache, GeminiEmbeddings } from "./gemini.js";
 export { MediaMessage } from "./multimodal.js";
-export { ChatOpenRouter, OpenRouterEmbeddings } from "./openrouter.js";
+export { ChatOpenAI, OpenAIEmbeddings } from "./openai.js";
 export { parseStream } from "./parsers/chunks.js";
 export { getMetadata } from "./parsers/metadata.js";
 export { parseBatch, parseInvoke } from "./parsers/responses.js";

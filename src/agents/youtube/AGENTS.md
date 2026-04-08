@@ -44,7 +44,7 @@
 
 ## Syntax Relationships
 
-- `summarizerLite.ts -> ChatOpenRouter + getTranscript + fastCopy tag/filter/untag`
+- `summarizerLite.ts -> ChatOpenAI + getTranscript + fastCopy tag/filter/untag`
 - `summarizer.ts -> StateGraph + garbage_filter -> summary -> quality`
 - `summarizerGemini.ts -> GoogleGenAI + trackUsage`
 - `schemas.ts -> TagRangeSchema + s2hk conversion`
