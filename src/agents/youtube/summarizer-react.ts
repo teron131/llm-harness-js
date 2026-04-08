@@ -5,24 +5,24 @@ import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 
 import { ChatOpenAI } from "../../clients/openai.js";
 import {
-	filterContent,
-	tagContent,
-	untagContent,
+    filterContent,
+    tagContent,
+    untagContent,
 } from "../../tools/fs/fast-copy.js";
 import { getTranscript } from "../../tools/youtube/scraper.js";
 import { isYoutubeUrl } from "../../utils/youtube-utils.js";
 import {
-	getGarbageFilterPrompt,
-	getLangchainSummaryPrompt,
-	getQualityCheckPrompt,
+    getGarbageFilterPrompt,
+    getLangchainSummaryPrompt,
+    getQualityCheckPrompt,
 } from "./prompts.js";
 import {
-	GarbageIdentificationSchema,
-	isAcceptable,
-	percentageScore,
-	QualitySchema,
-	type Summary,
-	SummarySchema,
+    GarbageIdentificationSchema,
+    isAcceptable,
+    percentageScore,
+    QualitySchema,
+    type Summary,
+    SummarySchema,
 } from "./schemas.js";
 
 const SUMMARY_MODEL = "x-ai/grok-4.1-fast";
@@ -33,186 +33,188 @@ const MAX_ITERATIONS = 2;
 const TARGET_LANGUAGE = "en";
 
 const SummarizerState = Annotation.Root({
-	transcript: Annotation<string | null>,
-	summary: Annotation<Summary | null>,
-	quality: Annotation<ReturnType<typeof QualitySchema.parse> | null>,
-	targetLanguage: Annotation<string | null>,
-	iterationCount: Annotation<number>,
-	isComplete: Annotation<boolean>,
+    transcript: Annotation<string | null>,
+    summary: Annotation<Summary | null>,
+    quality: Annotation<ReturnType<typeof QualitySchema.parse> | null>,
+    targetLanguage: Annotation<string | null>,
+    iterationCount: Annotation<number>,
+    isComplete: Annotation<boolean>,
 });
 
 type SummarizerStateType = typeof SummarizerState.State;
 /** Helper for garbage filter node. */
 
 async function garbageFilterNode(state: SummarizerStateType) {
-	if (!state.transcript) {
-		return {};
-	}
+    if (!state.transcript) {
+        return {};
+    }
 
-	const taggedTranscript = tagContent(state.transcript);
-	const llm = ChatOpenAI({
-		model: FAST_MODEL,
-		temperature: 0,
-		reasoningEffort: "low",
-	}).withStructuredOutput(GarbageIdentificationSchema);
+    const taggedTranscript = tagContent(state.transcript);
+    const llm = ChatOpenAI({
+        model: FAST_MODEL,
+        temperature: 0,
+        reasoningEffort: "low",
+    }).withStructuredOutput(GarbageIdentificationSchema);
 
-	const garbage = await llm.invoke([
-		new SystemMessage(getGarbageFilterPrompt()),
-		new HumanMessage(taggedTranscript),
-	]);
-	if (garbage.garbage_ranges.length === 0) {
-		return {};
-	}
+    const garbage = await llm.invoke([
+        new SystemMessage(getGarbageFilterPrompt()),
+        new HumanMessage(taggedTranscript),
+    ]);
+    if (garbage.garbage_ranges.length === 0) {
+        return {};
+    }
 
-	const filtered = filterContent(taggedTranscript, garbage.garbage_ranges);
-	return { transcript: untagContent(filtered) };
+    const filtered = filterContent(taggedTranscript, garbage.garbage_ranges);
+    return { transcript: untagContent(filtered) };
 }
 /** Helper for summary node. */
 
 async function summaryNode(state: SummarizerStateType) {
-	const llm = ChatOpenAI({
-		model: SUMMARY_MODEL,
-		temperature: 0,
-		reasoningEffort: "medium",
-	}).withStructuredOutput(SummarySchema);
+    const llm = ChatOpenAI({
+        model: SUMMARY_MODEL,
+        temperature: 0,
+        reasoningEffort: "medium",
+    }).withStructuredOutput(SummarySchema);
 
-	const summary = await llm.invoke([
-		new SystemMessage(
-			getLangchainSummaryPrompt(state.targetLanguage ?? TARGET_LANGUAGE),
-		),
-		new HumanMessage(`Transcript:\n${state.transcript ?? ""}`),
-	]);
+    const summary = await llm.invoke([
+        new SystemMessage(
+            getLangchainSummaryPrompt(state.targetLanguage ?? TARGET_LANGUAGE),
+        ),
+        new HumanMessage(`Transcript:\n${state.transcript ?? ""}`),
+    ]);
 
-	return {
-		summary,
-		iterationCount: (state.iterationCount ?? 0) + 1,
-	};
+    return {
+        summary,
+        iterationCount: (state.iterationCount ?? 0) + 1,
+    };
 }
 /** Helper for quality node. */
 
 async function qualityNode(state: SummarizerStateType) {
-	const llm = ChatOpenAI({
-		model: QUALITY_MODEL,
-		temperature: 0,
-		reasoningEffort: "low",
-	}).withStructuredOutput(QualitySchema);
+    const llm = ChatOpenAI({
+        model: QUALITY_MODEL,
+        temperature: 0,
+        reasoningEffort: "low",
+    }).withStructuredOutput(QualitySchema);
 
-	const quality = await llm.invoke([
-		new SystemMessage(
-			getQualityCheckPrompt(state.targetLanguage ?? TARGET_LANGUAGE),
-		),
-		new HumanMessage(
-			`Transcript:\n${state.transcript ?? ""}\n\nSummary:\n${JSON.stringify(state.summary ?? {})}`,
-		),
-	]);
+    const quality = await llm.invoke([
+        new SystemMessage(
+            getQualityCheckPrompt(state.targetLanguage ?? TARGET_LANGUAGE),
+        ),
+        new HumanMessage(
+            `Transcript:\n${state.transcript ?? ""}\n\nSummary:\n${JSON.stringify(state.summary ?? {})}`,
+        ),
+    ]);
 
-	return {
-		quality,
-		isComplete: isAcceptable(quality),
-	};
+    return {
+        quality,
+        isComplete: isAcceptable(quality),
+    };
 }
 /** Return whether ReAct graph YouTube summarization should continue. */
 
 function shouldContinue(state: SummarizerStateType) {
-	const qualityPercent = state.quality ? percentageScore(state.quality) : null;
+    const qualityPercent = state.quality
+        ? percentageScore(state.quality)
+        : null;
 
-	if (state.isComplete) {
-		return END;
-	}
+    if (state.isComplete) {
+        return END;
+    }
 
-	if (
-		state.quality &&
-		!isAcceptable(state.quality) &&
-		(state.iterationCount ?? 0) < MAX_ITERATIONS
-	) {
-		return "summary";
-	}
+    if (
+        state.quality &&
+        !isAcceptable(state.quality) &&
+        (state.iterationCount ?? 0) < MAX_ITERATIONS
+    ) {
+        return "summary";
+    }
 
-	if (qualityPercent !== null && qualityPercent >= MIN_QUALITY_SCORE) {
-		return END;
-	}
+    if (qualityPercent !== null && qualityPercent >= MIN_QUALITY_SCORE) {
+        return END;
+    }
 
-	return END;
+    return END;
 }
 /** Create the summarization graph. */
 
 function createGraph() {
-	return new StateGraph(SummarizerState)
-		.addNode("garbage_filter", garbageFilterNode)
-		.addNode("summary", summaryNode)
-		.addNode("quality", qualityNode)
-		.addEdge(START, "garbage_filter")
-		.addEdge("garbage_filter", "summary")
-		.addEdge("summary", "quality")
-		.addConditionalEdges("quality", shouldContinue, {
-			summary: "summary",
-			[END]: END,
-		})
-		.compile();
+    return new StateGraph(SummarizerState)
+        .addNode("garbage_filter", garbageFilterNode)
+        .addNode("summary", summaryNode)
+        .addNode("quality", qualityNode)
+        .addEdge(START, "garbage_filter")
+        .addEdge("garbage_filter", "summary")
+        .addEdge("summary", "quality")
+        .addConditionalEdges("quality", shouldContinue, {
+            summary: "summary",
+            [END]: END,
+        })
+        .compile();
 }
 /** Extract the transcript. */
 
 function extractTranscript(transcriptOrUrl: string): Promise<string> {
-	if (isYoutubeUrl(transcriptOrUrl)) {
-		return getTranscript(transcriptOrUrl);
-	}
-	if (!transcriptOrUrl.trim()) {
-		throw new Error("Transcript cannot be empty");
-	}
-	return Promise.resolve(transcriptOrUrl);
+    if (isYoutubeUrl(transcriptOrUrl)) {
+        return getTranscript(transcriptOrUrl);
+    }
+    if (!transcriptOrUrl.trim()) {
+        throw new Error("Transcript cannot be empty");
+    }
+    return Promise.resolve(transcriptOrUrl);
 }
 /** Summarize a YouTube video with the ReAct workflow. */
 
 export async function summarizeVideo({
-	transcriptOrUrl,
-	targetLanguage,
+    transcriptOrUrl,
+    targetLanguage,
 }: {
-	transcriptOrUrl: string;
-	targetLanguage?: string | null;
+    transcriptOrUrl: string;
+    targetLanguage?: string | null;
 }): Promise<Summary> {
-	const graph = createGraph();
-	const transcript = await extractTranscript(transcriptOrUrl);
+    const graph = createGraph();
+    const transcript = await extractTranscript(transcriptOrUrl);
 
-	const result = await graph.invoke({
-		transcript,
-		summary: null,
-		quality: null,
-		targetLanguage: targetLanguage ?? TARGET_LANGUAGE,
-		iterationCount: 0,
-		isComplete: false,
-	});
+    const result = await graph.invoke({
+        transcript,
+        summary: null,
+        quality: null,
+        targetLanguage: targetLanguage ?? TARGET_LANGUAGE,
+        iterationCount: 0,
+        isComplete: false,
+    });
 
-	if (!result.summary) {
-		throw new Error("Summary was not generated");
-	}
+    if (!result.summary) {
+        throw new Error("Summary was not generated");
+    }
 
-	return result.summary;
+    return result.summary;
 }
 /** Stream a YouTube video summary. */
 
 export async function* streamSummarizeVideo({
-	transcriptOrUrl,
-	targetLanguage,
+    transcriptOrUrl,
+    targetLanguage,
 }: {
-	transcriptOrUrl: string;
-	targetLanguage?: string | null;
+    transcriptOrUrl: string;
+    targetLanguage?: string | null;
 }) {
-	const graph = createGraph();
-	const transcript = await extractTranscript(transcriptOrUrl);
+    const graph = createGraph();
+    const transcript = await extractTranscript(transcriptOrUrl);
 
-	const stream = await graph.stream(
-		{
-			transcript,
-			summary: null,
-			quality: null,
-			targetLanguage: targetLanguage ?? TARGET_LANGUAGE,
-			iterationCount: 0,
-			isComplete: false,
-		},
-		{ streamMode: "values" },
-	);
+    const stream = await graph.stream(
+        {
+            transcript,
+            summary: null,
+            quality: null,
+            targetLanguage: targetLanguage ?? TARGET_LANGUAGE,
+            iterationCount: 0,
+            isComplete: false,
+        },
+        { streamMode: "values" },
+    );
 
-	for await (const chunk of stream) {
-		yield chunk;
-	}
+    for await (const chunk of stream) {
+        yield chunk;
+    }
 }

@@ -4,421 +4,426 @@
 import { asFiniteNumber, asRecord, type JsonObject } from "../shared";
 
 import {
-	attachRelativeScores,
-	blendedPriceValue,
-	buildScores,
+    attachRelativeScores,
+    blendedPriceValue,
+    buildScores,
 } from "./scoring";
 import type {
-	EnrichedRows,
-	FinalStageConfig,
-	ModelStatsSelectedModel,
-	ScoringConfig,
+    EnrichedRows,
+    FinalStageConfig,
+    ModelStatsSelectedModel,
+    ScoringConfig,
 } from "./types";
 
 const EMPTY_OPENROUTER_PRICING = {
-	weighted_input: null,
-	weighted_output: null,
+    weighted_input: null,
+    weighted_output: null,
 } as const;
 const MIN_INTELLIGENCE_COST_TOKEN_THRESHOLD = 1_000_000;
 const INTELLIGENCE_COST_TOTAL_COST_KEY = "intelligence_index_cost_total_cost";
 const INTELLIGENCE_COST_TOTAL_TOKENS_KEY =
-	"intelligence_index_cost_total_tokens";
+    "intelligence_index_cost_total_tokens";
 const STABLE_TOP_LEVEL_KEYS = new Set<string>([
-	"id",
-	"name",
-	"provider",
-	"logo",
-	"attachment",
-	"reasoning",
-	"release_date",
-	"modalities",
-	"open_weights",
-	"cost",
-	"context_window",
-	"speed",
-	"intelligence",
-	"intelligence_index_cost",
-	"evaluations",
-	"scores",
-	"relative_scores",
+    "id",
+    "name",
+    "provider",
+    "logo",
+    "attachment",
+    "reasoning",
+    "release_date",
+    "modalities",
+    "open_weights",
+    "cost",
+    "context_window",
+    "speed",
+    "intelligence",
+    "intelligence_index_cost",
+    "evaluations",
+    "scores",
+    "relative_scores",
 ]);
 /** Resolve the provider for Final-stage LLM stats selection. */
 
 function providerFromId(modelId: unknown): string | null {
-	if (typeof modelId !== "string") {
-		return null;
-	}
-	const slashIndex = modelId.indexOf("/");
-	if (slashIndex <= 0) {
-		return null;
-	}
-	return modelId.slice(0, slashIndex);
+    if (typeof modelId !== "string") {
+        return null;
+    }
+    const slashIndex = modelId.indexOf("/");
+    if (slashIndex <= 0) {
+        return null;
+    }
+    return modelId.slice(0, slashIndex);
 }
 /** Resolve the provider for Final-stage LLM stats selection. */
 
 function providerFromModel(model: JsonObject): string | null {
-	const fromId = providerFromId(model.id);
-	if (fromId) {
-		return fromId;
-	}
-	return typeof model.provider_id === "string" ? model.provider_id : null;
+    const fromId = providerFromId(model.id);
+    if (fromId) {
+        return fromId;
+    }
+    return typeof model.provider_id === "string" ? model.provider_id : null;
 }
 /** Build the logo field for Final-stage LLM stats selection. */
 
 function buildLogo(model: JsonObject, provider: string | null): string {
-	if (typeof model.logo === "string" && model.logo.length > 0) {
-		return model.logo;
-	}
-	const logoSlug = asRecord(model.model_creator).slug;
-	if (typeof logoSlug === "string" && logoSlug.length > 0) {
-		return `https://artificialanalysis.ai/img/logos/${logoSlug}_small.svg`;
-	}
-	return `https://models.dev/logos/${provider ?? "unknown"}.svg`;
+    if (typeof model.logo === "string" && model.logo.length > 0) {
+        return model.logo;
+    }
+    const logoSlug = asRecord(model.model_creator).slug;
+    if (typeof logoSlug === "string" && logoSlug.length > 0) {
+        return `https://artificialanalysis.ai/img/logos/${logoSlug}_small.svg`;
+    }
+    return `https://models.dev/logos/${provider ?? "unknown"}.svg`;
 }
 /** Build the speed score for Final-stage LLM stats selection. */
 
 function buildSpeed(
-	model: JsonObject,
-	modelId: string | null,
-	openRouterSpeedById: Map<string, JsonObject>,
+    model: JsonObject,
+    modelId: string | null,
+    openRouterSpeedById: Map<string, JsonObject>,
 ): JsonObject {
-	const openRouterSpeed = modelId ? openRouterSpeedById.get(modelId) : null;
-	const throughput =
-		asFiniteNumber(openRouterSpeed?.throughput_tokens_per_second_median) ??
-		asFiniteNumber(model.median_output_tokens_per_second);
-	const latency =
-		asFiniteNumber(openRouterSpeed?.latency_seconds_median) ??
-		asFiniteNumber(model.median_time_to_first_token_seconds);
-	const e2eLatency =
-		asFiniteNumber(openRouterSpeed?.e2e_latency_seconds_median) ??
-		asFiniteNumber(model.median_time_to_first_answer_token) ??
-		latency;
-	return {
-		throughput_tokens_per_second_median: throughput,
-		latency_seconds_median: latency,
-		e2e_latency_seconds_median: e2eLatency,
-	};
+    const openRouterSpeed = modelId ? openRouterSpeedById.get(modelId) : null;
+    const throughput =
+        asFiniteNumber(openRouterSpeed?.throughput_tokens_per_second_median) ??
+        asFiniteNumber(model.median_output_tokens_per_second);
+    const latency =
+        asFiniteNumber(openRouterSpeed?.latency_seconds_median) ??
+        asFiniteNumber(model.median_time_to_first_token_seconds);
+    const e2eLatency =
+        asFiniteNumber(openRouterSpeed?.e2e_latency_seconds_median) ??
+        asFiniteNumber(model.median_time_to_first_answer_token) ??
+        latency;
+    return {
+        throughput_tokens_per_second_median: throughput,
+        latency_seconds_median: latency,
+        e2e_latency_seconds_median: e2eLatency,
+    };
 }
 /** Build the cost score for Final-stage LLM stats selection. */
 
 function buildCost(
-	model: JsonObject,
-	openRouterPricing: JsonObject,
-	scoringConfig: ScoringConfig,
+    model: JsonObject,
+    openRouterPricing: JsonObject,
+    scoringConfig: ScoringConfig,
 ): unknown {
-	const baseCost = asRecord(model.cost);
-	const cleanedCost: JsonObject = Object.fromEntries(
-		Object.entries(baseCost).filter(([, value]) => value != null),
-	);
-	const weightedInput = asFiniteNumber(openRouterPricing.weighted_input);
-	const weightedOutput = asFiniteNumber(openRouterPricing.weighted_output);
-	if (weightedInput != null) {
-		cleanedCost.weighted_input = weightedInput;
-	}
-	if (weightedOutput != null) {
-		cleanedCost.weighted_output = weightedOutput;
-	}
-	const blendedPrice = blendedPriceValue(cleanedCost, scoringConfig);
-	if (blendedPrice != null) {
-		cleanedCost.blended_price = blendedPrice;
-	}
-	return Object.keys(cleanedCost).length > 0 ? cleanedCost : null;
+    const baseCost = asRecord(model.cost);
+    const cleanedCost: JsonObject = Object.fromEntries(
+        Object.entries(baseCost).filter(([, value]) => value != null),
+    );
+    const weightedInput = asFiniteNumber(openRouterPricing.weighted_input);
+    const weightedOutput = asFiniteNumber(openRouterPricing.weighted_output);
+    if (weightedInput != null) {
+        cleanedCost.weighted_input = weightedInput;
+    }
+    if (weightedOutput != null) {
+        cleanedCost.weighted_output = weightedOutput;
+    }
+    const blendedPrice = blendedPriceValue(cleanedCost, scoringConfig);
+    if (blendedPrice != null) {
+        cleanedCost.blended_price = blendedPrice;
+    }
+    return Object.keys(cleanedCost).length > 0 ? cleanedCost : null;
 }
 /** Build evaluation fields for Final-stage LLM stats selection. */
 
 function buildEvaluations(model: JsonObject): unknown {
-	const evaluations = asRecord(model.evaluations);
-	return Object.keys(evaluations).length > 0 ? evaluations : null;
+    const evaluations = asRecord(model.evaluations);
+    return Object.keys(evaluations).length > 0 ? evaluations : null;
 }
 /** Build the intelligence score for Final-stage LLM stats selection. */
 
 function buildIntelligence(model: JsonObject): unknown {
-	const intelligence = asRecord(model.intelligence);
-	const nonhallucinationRate = asFiniteNumber(
-		intelligence.omniscience_hallucination_rate,
-	);
-	if (nonhallucinationRate != null) {
-		intelligence.omniscience_nonhallucination_rate = nonhallucinationRate;
-		delete intelligence.omniscience_hallucination_rate;
-	}
-	delete intelligence[INTELLIGENCE_COST_TOTAL_COST_KEY];
-	delete intelligence[INTELLIGENCE_COST_TOTAL_TOKENS_KEY];
-	return Object.keys(intelligence).length > 0 ? intelligence : null;
+    const intelligence = asRecord(model.intelligence);
+    const nonhallucinationRate = asFiniteNumber(
+        intelligence.omniscience_hallucination_rate,
+    );
+    if (nonhallucinationRate != null) {
+        intelligence.omniscience_nonhallucination_rate = nonhallucinationRate;
+        delete intelligence.omniscience_hallucination_rate;
+    }
+    delete intelligence[INTELLIGENCE_COST_TOTAL_COST_KEY];
+    delete intelligence[INTELLIGENCE_COST_TOTAL_TOKENS_KEY];
+    return Object.keys(intelligence).length > 0 ? intelligence : null;
 }
 /** Build the intelligence index cost for Final-stage LLM stats selection. */
 
 function buildIntelligenceIndexCost(model: JsonObject): unknown {
-	const fromRow = asRecord(model.intelligence_index_cost);
-	const fromIntelligence = asRecord(model.intelligence);
-	const totalCost =
-		asFiniteNumber(fromRow.total_cost) ??
-		asFiniteNumber(fromIntelligence[INTELLIGENCE_COST_TOTAL_COST_KEY]);
-	const totalTokens =
-		asFiniteNumber(fromRow.total_tokens) ??
-		asFiniteNumber(fromIntelligence[INTELLIGENCE_COST_TOTAL_TOKENS_KEY]);
-	const normalized = {
-		...fromRow,
-		total_cost: totalCost,
-		total_tokens:
-			totalTokens != null &&
-			totalTokens >= MIN_INTELLIGENCE_COST_TOKEN_THRESHOLD
-				? totalTokens
-				: null,
-	} as JsonObject;
-	const cleaned = Object.fromEntries(
-		Object.entries(normalized).filter(([, value]) => value != null),
-	);
-	return Object.keys(cleaned).length > 0 ? cleaned : null;
+    const fromRow = asRecord(model.intelligence_index_cost);
+    const fromIntelligence = asRecord(model.intelligence);
+    const totalCost =
+        asFiniteNumber(fromRow.total_cost) ??
+        asFiniteNumber(fromIntelligence[INTELLIGENCE_COST_TOTAL_COST_KEY]);
+    const totalTokens =
+        asFiniteNumber(fromRow.total_tokens) ??
+        asFiniteNumber(fromIntelligence[INTELLIGENCE_COST_TOTAL_TOKENS_KEY]);
+    const normalized = {
+        ...fromRow,
+        total_cost: totalCost,
+        total_tokens:
+            totalTokens != null &&
+            totalTokens >= MIN_INTELLIGENCE_COST_TOKEN_THRESHOLD
+                ? totalTokens
+                : null,
+    } as JsonObject;
+    const cleaned = Object.fromEntries(
+        Object.entries(normalized).filter(([, value]) => value != null),
+    );
+    return Object.keys(cleaned).length > 0 ? cleaned : null;
 }
 /** Helper for intelligence relative score value. */
 
 function intelligenceRelativeScoreValue(
-	model: ModelStatsSelectedModel,
+    model: ModelStatsSelectedModel,
 ): number | null {
-	return asFiniteNumber(asRecord(model.relative_scores).intelligence_score);
+    return asFiniteNumber(asRecord(model.relative_scores).intelligence_score);
 }
 /** Sort the models by intelligence relative score. */
 
 function sortModelsByIntelligenceRelativeScore(
-	models: ModelStatsSelectedModel[],
+    models: ModelStatsSelectedModel[],
 ): ModelStatsSelectedModel[] {
-	return [...models].sort((left, right) => {
-		const leftIntelligence = intelligenceRelativeScoreValue(left);
-		const rightIntelligence = intelligenceRelativeScoreValue(right);
-		if (leftIntelligence == null && rightIntelligence == null) {
-			return (left.id ?? "").localeCompare(right.id ?? "");
-		}
-		if (leftIntelligence == null) {
-			return 1;
-		}
-		if (rightIntelligence == null) {
-			return -1;
-		}
-		if (leftIntelligence !== rightIntelligence) {
-			return rightIntelligence - leftIntelligence;
-		}
-		return (left.id ?? "").localeCompare(right.id ?? "");
-	});
+    return [...models].sort((left, right) => {
+        const leftIntelligence = intelligenceRelativeScoreValue(left);
+        const rightIntelligence = intelligenceRelativeScoreValue(right);
+        if (leftIntelligence == null && rightIntelligence == null) {
+            return (left.id ?? "").localeCompare(right.id ?? "");
+        }
+        if (leftIntelligence == null) {
+            return 1;
+        }
+        if (rightIntelligence == null) {
+            return -1;
+        }
+        if (leftIntelligence !== rightIntelligence) {
+            return rightIntelligence - leftIntelligence;
+        }
+        return (left.id ?? "").localeCompare(right.id ?? "");
+    });
 }
 /** Return whether plain object is true. */
 
 function isPlainObject(value: unknown): value is JsonObject {
-	return value != null && typeof value === "object" && !Array.isArray(value);
+    return value != null && typeof value === "object" && !Array.isArray(value);
 }
 /** Return whether within recent lookback is true. */
 
 function isWithinRecentLookback(
-	releaseDate: string | null,
-	lookbackDays: number,
+    releaseDate: string | null,
+    lookbackDays: number,
 ): boolean {
-	if (typeof releaseDate !== "string" || releaseDate.length === 0) {
-		return false;
-	}
-	const releaseTimestampMs = Date.parse(releaseDate);
-	if (!Number.isFinite(releaseTimestampMs)) {
-		return false;
-	}
-	const cutoffMs = Date.now() - lookbackDays * 24 * 60 * 60 * 1000;
-	return releaseTimestampMs >= cutoffMs;
+    if (typeof releaseDate !== "string" || releaseDate.length === 0) {
+        return false;
+    }
+    const releaseTimestampMs = Date.parse(releaseDate);
+    if (!Number.isFinite(releaseTimestampMs)) {
+        return false;
+    }
+    const cutoffMs = Date.now() - lookbackDays * 24 * 60 * 60 * 1000;
+    return releaseTimestampMs >= cutoffMs;
 }
 /** Select the prune sample models. */
 
 function selectPruneSampleModels(
-	models: ModelStatsSelectedModel[],
-	finalConfig: FinalStageConfig,
+    models: ModelStatsSelectedModel[],
+    finalConfig: FinalStageConfig,
 ): ModelStatsSelectedModel[] {
-	const recentModels = models.filter((model) =>
-		isWithinRecentLookback(
-			model.release_date,
-			finalConfig.nullFieldPruneRecentLookbackDays,
-		),
-	);
-	return recentModels.length > 0 ? recentModels : models;
+    const recentModels = models.filter((model) =>
+        isWithinRecentLookback(
+            model.release_date,
+            finalConfig.nullFieldPruneRecentLookbackDays,
+        ),
+    );
+    return recentModels.length > 0 ? recentModels : models;
 }
 /** Helper for count nullish top level key. */
 
 function countNullishTopLevelKey(
-	models: ModelStatsSelectedModel[],
-	key: string,
+    models: ModelStatsSelectedModel[],
+    key: string,
 ): number {
-	return models.reduce((count, model) => {
-		const modelRecord = asRecord(model);
-		return modelRecord[key] == null ? count + 1 : count;
-	}, 0);
+    return models.reduce((count, model) => {
+        const modelRecord = asRecord(model);
+        return modelRecord[key] == null ? count + 1 : count;
+    }, 0);
 }
 /** Helper for count nullish nested key. */
 
 function countNullishNestedKey(
-	models: ModelStatsSelectedModel[],
-	parentKey: string,
-	nestedKey: string,
+    models: ModelStatsSelectedModel[],
+    parentKey: string,
+    nestedKey: string,
 ): number {
-	return models.reduce((count, model) => {
-		const modelRecord = asRecord(model);
-		const parentValue = modelRecord[parentKey];
-		if (!isPlainObject(parentValue) || parentValue[nestedKey] == null) {
-			return count + 1;
-		}
-		return count;
-	}, 0);
+    return models.reduce((count, model) => {
+        const modelRecord = asRecord(model);
+        const parentValue = modelRecord[parentKey];
+        if (!isPlainObject(parentValue) || parentValue[nestedKey] == null) {
+            return count + 1;
+        }
+        return count;
+    }, 0);
 }
 /** Prune the sparse fields. */
 
 function pruneSparseFields(
-	models: ModelStatsSelectedModel[],
-	finalConfig: FinalStageConfig,
+    models: ModelStatsSelectedModel[],
+    finalConfig: FinalStageConfig,
 ): ModelStatsSelectedModel[] {
-	if (models.length === 0) {
-		return models;
-	}
+    if (models.length === 0) {
+        return models;
+    }
 
-	const sampleModels = selectPruneSampleModels(models, finalConfig);
-	const sampleTotal = sampleModels.length;
-	const topLevelKeys = new Set<string>();
-	const nestedKeysByParent = new Map<string, Set<string>>();
+    const sampleModels = selectPruneSampleModels(models, finalConfig);
+    const sampleTotal = sampleModels.length;
+    const topLevelKeys = new Set<string>();
+    const nestedKeysByParent = new Map<string, Set<string>>();
 
-	for (const model of models) {
-		for (const [key, value] of Object.entries(model)) {
-			topLevelKeys.add(key);
-			if (!isPlainObject(value)) {
-				continue;
-			}
-			const nestedKeys = nestedKeysByParent.get(key) ?? new Set<string>();
-			for (const nestedKey of Object.keys(value)) {
-				nestedKeys.add(nestedKey);
-			}
-			nestedKeysByParent.set(key, nestedKeys);
-		}
-	}
+    for (const model of models) {
+        for (const [key, value] of Object.entries(model)) {
+            topLevelKeys.add(key);
+            if (!isPlainObject(value)) {
+                continue;
+            }
+            const nestedKeys = nestedKeysByParent.get(key) ?? new Set<string>();
+            for (const nestedKey of Object.keys(value)) {
+                nestedKeys.add(nestedKey);
+            }
+            nestedKeysByParent.set(key, nestedKeys);
+        }
+    }
 
-	const topLevelKeysToPrune = new Set<string>();
-	for (const key of topLevelKeys) {
-		if (STABLE_TOP_LEVEL_KEYS.has(key)) {
-			continue;
-		}
-		const nullCount = countNullishTopLevelKey(sampleModels, key);
-		if (nullCount / sampleTotal > finalConfig.nullFieldPruneThreshold) {
-			topLevelKeysToPrune.add(key);
-		}
-	}
+    const topLevelKeysToPrune = new Set<string>();
+    for (const key of topLevelKeys) {
+        if (STABLE_TOP_LEVEL_KEYS.has(key)) {
+            continue;
+        }
+        const nullCount = countNullishTopLevelKey(sampleModels, key);
+        if (nullCount / sampleTotal > finalConfig.nullFieldPruneThreshold) {
+            topLevelKeysToPrune.add(key);
+        }
+    }
 
-	const nestedKeysToPruneByParent = new Map<string, Set<string>>();
-	for (const [parentKey, nestedKeys] of nestedKeysByParent) {
-		if (parentKey !== "evaluations") {
-			continue;
-		}
-		const keysToPrune = new Set<string>();
-		for (const nestedKey of nestedKeys) {
-			const nullCount = countNullishNestedKey(
-				sampleModels,
-				parentKey,
-				nestedKey,
-			);
-			if (nullCount / sampleTotal > finalConfig.nullFieldPruneThreshold) {
-				keysToPrune.add(nestedKey);
-			}
-		}
-		if (keysToPrune.size > 0) {
-			nestedKeysToPruneByParent.set(parentKey, keysToPrune);
-		}
-	}
+    const nestedKeysToPruneByParent = new Map<string, Set<string>>();
+    for (const [parentKey, nestedKeys] of nestedKeysByParent) {
+        if (parentKey !== "evaluations") {
+            continue;
+        }
+        const keysToPrune = new Set<string>();
+        for (const nestedKey of nestedKeys) {
+            const nullCount = countNullishNestedKey(
+                sampleModels,
+                parentKey,
+                nestedKey,
+            );
+            if (nullCount / sampleTotal > finalConfig.nullFieldPruneThreshold) {
+                keysToPrune.add(nestedKey);
+            }
+        }
+        if (keysToPrune.size > 0) {
+            nestedKeysToPruneByParent.set(parentKey, keysToPrune);
+        }
+    }
 
-	return models.map((model) => {
-		const nextModel: JsonObject = { ...model };
-		for (const key of topLevelKeysToPrune) {
-			delete nextModel[key];
-		}
-		for (const [parentKey, nestedKeysToPrune] of nestedKeysToPruneByParent) {
-			const parentValue = nextModel[parentKey];
-			if (!isPlainObject(parentValue)) {
-				continue;
-			}
-			const nextParentValue: JsonObject = { ...parentValue };
-			for (const nestedKey of nestedKeysToPrune) {
-				delete nextParentValue[nestedKey];
-			}
-			nextModel[parentKey] = nextParentValue;
-		}
-		return nextModel as ModelStatsSelectedModel;
-	});
+    return models.map((model) => {
+        const nextModel: JsonObject = { ...model };
+        for (const key of topLevelKeysToPrune) {
+            delete nextModel[key];
+        }
+        for (const [
+            parentKey,
+            nestedKeysToPrune,
+        ] of nestedKeysToPruneByParent) {
+            const parentValue = nextModel[parentKey];
+            if (!isPlainObject(parentValue)) {
+                continue;
+            }
+            const nextParentValue: JsonObject = { ...parentValue };
+            for (const nestedKey of nestedKeysToPrune) {
+                delete nextParentValue[nestedKey];
+            }
+            nextModel[parentKey] = nextParentValue;
+        }
+        return nextModel as ModelStatsSelectedModel;
+    });
 }
 /** Filter the models by id. */
 
 function filterModelsById(
-	models: ModelStatsSelectedModel[],
-	id: string | null | undefined,
+    models: ModelStatsSelectedModel[],
+    id: string | null | undefined,
 ): ModelStatsSelectedModel[] {
-	if (id == null) {
-		return models;
-	}
-	return models.filter((model) => model.id === id);
+    if (id == null) {
+        return models;
+    }
+    return models.filter((model) => model.id === id);
 }
 
 /** Build the final public model row from one enriched intermediate row. */
 function projectFinalModel(
-	row: unknown,
-	openRouterSpeedById: Map<string, JsonObject>,
-	openRouterPricingById: Map<string, JsonObject>,
-	speedOutputTokenAnchors: number[],
-	scoringConfig: ScoringConfig,
+    row: unknown,
+    openRouterSpeedById: Map<string, JsonObject>,
+    openRouterPricingById: Map<string, JsonObject>,
+    speedOutputTokenAnchors: number[],
+    scoringConfig: ScoringConfig,
 ): ModelStatsSelectedModel {
-	const model = asRecord(row);
-	const provider = providerFromModel(model);
-	const modelId = typeof model.id === "string" ? model.id : null;
-	const speed = buildSpeed(model, modelId, openRouterSpeedById);
-	const pricing =
-		(modelId != null ? openRouterPricingById.get(modelId) : null) ??
-		EMPTY_OPENROUTER_PRICING;
-	const cost = buildCost(model, pricing, scoringConfig);
-	return {
-		id: modelId,
-		name: typeof model.name === "string" ? model.name : null,
-		provider,
-		logo: buildLogo(model, provider),
-		attachment: typeof model.attachment === "boolean" ? model.attachment : null,
-		reasoning: typeof model.reasoning === "boolean" ? model.reasoning : null,
-		release_date:
-			typeof model.release_date === "string" ? model.release_date : null,
-		modalities: model.modalities ?? null,
-		open_weights:
-			typeof model.open_weights === "boolean" ? model.open_weights : null,
-		cost,
-		context_window: model.limit ?? null,
-		speed,
-		intelligence: buildIntelligence(model),
-		intelligence_index_cost: buildIntelligenceIndexCost(model),
-		evaluations: buildEvaluations(model),
-		scores: buildScores(
-			model,
-			cost,
-			speed,
-			speedOutputTokenAnchors,
-			scoringConfig,
-		),
-		relative_scores: null,
-	};
+    const model = asRecord(row);
+    const provider = providerFromModel(model);
+    const modelId = typeof model.id === "string" ? model.id : null;
+    const speed = buildSpeed(model, modelId, openRouterSpeedById);
+    const pricing =
+        (modelId != null ? openRouterPricingById.get(modelId) : null) ??
+        EMPTY_OPENROUTER_PRICING;
+    const cost = buildCost(model, pricing, scoringConfig);
+    return {
+        id: modelId,
+        name: typeof model.name === "string" ? model.name : null,
+        provider,
+        logo: buildLogo(model, provider),
+        attachment:
+            typeof model.attachment === "boolean" ? model.attachment : null,
+        reasoning:
+            typeof model.reasoning === "boolean" ? model.reasoning : null,
+        release_date:
+            typeof model.release_date === "string" ? model.release_date : null,
+        modalities: model.modalities ?? null,
+        open_weights:
+            typeof model.open_weights === "boolean" ? model.open_weights : null,
+        cost,
+        context_window: model.limit ?? null,
+        speed,
+        intelligence: buildIntelligence(model),
+        intelligence_index_cost: buildIntelligenceIndexCost(model),
+        evaluations: buildEvaluations(model),
+        scores: buildScores(
+            model,
+            cost,
+            speed,
+            speedOutputTokenAnchors,
+            scoringConfig,
+        ),
+        relative_scores: null,
+    };
 }
 
 /** Build the final selected models list and attach the normalized ranking layer used for ordering. */
 export function buildFinalModels(
-	enrichedRows: EnrichedRows,
-	id: string | null | undefined,
-	finalConfig: FinalStageConfig,
-	scoringConfig: ScoringConfig,
+    enrichedRows: EnrichedRows,
+    id: string | null | undefined,
+    finalConfig: FinalStageConfig,
+    scoringConfig: ScoringConfig,
 ): ModelStatsSelectedModel[] {
-	const models = enrichedRows.rows.map((row) =>
-		projectFinalModel(
-			row,
-			enrichedRows.openRouterSpeedById,
-			enrichedRows.openRouterPricingById,
-			enrichedRows.speedOutputTokenAnchors,
-			scoringConfig,
-		),
-	);
-	const modelsWithRelativeScores = attachRelativeScores(models);
-	const sortedModels = sortModelsByIntelligenceRelativeScore(
-		modelsWithRelativeScores,
-	);
-	const prunedModels = pruneSparseFields(sortedModels, finalConfig);
-	return filterModelsById(prunedModels, id);
+    const models = enrichedRows.rows.map((row) =>
+        projectFinalModel(
+            row,
+            enrichedRows.openRouterSpeedById,
+            enrichedRows.openRouterPricingById,
+            enrichedRows.speedOutputTokenAnchors,
+            scoringConfig,
+        ),
+    );
+    const modelsWithRelativeScores = attachRelativeScores(models);
+    const sortedModels = sortModelsByIntelligenceRelativeScore(
+        modelsWithRelativeScores,
+    );
+    const prunedModels = pruneSparseFields(sortedModels, finalConfig);
+    return filterModelsById(prunedModels, id);
 }

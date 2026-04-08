@@ -1,12 +1,12 @@
 /** OpenRouter enrichment helpers for LLM stats selection. */
 
 import {
-	asFiniteNumber,
-	asRecord,
-	type JsonObject,
-	modelSlugFromModelId,
-	normalizeProviderModelId,
-	PRIMARY_PROVIDER_ID,
+    asFiniteNumber,
+    asRecord,
+    type JsonObject,
+    modelSlugFromModelId,
+    normalizeProviderModelId,
+    PRIMARY_PROVIDER_ID,
 } from "../shared";
 /** OpenRouter enrichment stage for LLM stats: dedupe rows, backfill free costs, and fetch speed/pricing enrichments. */
 import { getOpenRouterScrapedStats } from "../sources/openrouter-scraper";
@@ -18,255 +18,258 @@ const EPHEMERAL_SUFFIXES = ["-adaptive"] as const;
 /** Normalize OpenRouter speed values. */
 
 function normalizeOpenRouterSpeed(performance: unknown): JsonObject {
-	const parsed = asRecord(performance);
-	return {
-		throughput_tokens_per_second_median: asFiniteNumber(
-			parsed.throughput_tokens_per_second_median,
-		),
-		latency_seconds_median: asFiniteNumber(parsed.latency_seconds_median),
-		e2e_latency_seconds_median: asFiniteNumber(
-			parsed.e2e_latency_seconds_median,
-		),
-	};
+    const parsed = asRecord(performance);
+    return {
+        throughput_tokens_per_second_median: asFiniteNumber(
+            parsed.throughput_tokens_per_second_median,
+        ),
+        latency_seconds_median: asFiniteNumber(parsed.latency_seconds_median),
+        e2e_latency_seconds_median: asFiniteNumber(
+            parsed.e2e_latency_seconds_median,
+        ),
+    };
 }
 /** Normalize OpenRouter pricing values. */
 
 function normalizeOpenRouterPricing(pricing: unknown): JsonObject {
-	const parsed = asRecord(pricing);
-	return {
-		weighted_input: asFiniteNumber(parsed.weighted_input_price_per_1m),
-		weighted_output: asFiniteNumber(parsed.weighted_output_price_per_1m),
-	};
+    const parsed = asRecord(pricing);
+    return {
+        weighted_input: asFiniteNumber(parsed.weighted_input_price_per_1m),
+        weighted_output: asFiniteNumber(parsed.weighted_output_price_per_1m),
+    };
 }
 /** Return whether OpenRouter enrichment LLM stats selection has the expected signal. */
 
 function hasIntelligenceCost(row: JsonObject): boolean {
-	const intelligenceIndexCost = asRecord(row.intelligence_index_cost);
-	return asFiniteNumber(intelligenceIndexCost.total_cost) != null;
+    const intelligenceIndexCost = asRecord(row.intelligence_index_cost);
+    return asFiniteNumber(intelligenceIndexCost.total_cost) != null;
 }
 /** Return whether OpenRouter enrichment LLM stats selection has the expected signal. */
 
 function hasScoreSignal(row: JsonObject): boolean {
-	const scores = asRecord(row.scores);
-	return (
-		asFiniteNumber(scores.intelligence_score) != null ||
-		asFiniteNumber(scores.agentic_score) != null ||
-		asFiniteNumber(scores.speed_score) != null ||
-		asFiniteNumber(scores.price_score) != null
-	);
+    const scores = asRecord(row.scores);
+    return (
+        asFiniteNumber(scores.intelligence_score) != null ||
+        asFiniteNumber(scores.agentic_score) != null ||
+        asFiniteNumber(scores.speed_score) != null ||
+        asFiniteNumber(scores.price_score) != null
+    );
 }
 /** Compute a priority score for OpenRouter enrichment LLM stats selection. */
 
 function reasoningEffortPriority(
-	aaSlug: string | null,
-	canonicalSlug: string | null,
+    aaSlug: string | null,
+    canonicalSlug: string | null,
 ): number {
-	if (aaSlug == null || canonicalSlug == null) {
-		return 0;
-	}
-	const normalizedAaSlug = normalizeProviderModelId(aaSlug);
-	const normalizedCanonicalSlug = normalizeProviderModelId(canonicalSlug);
-	for (const suffix of EPHEMERAL_SUFFIXES) {
-		if (normalizedAaSlug === `${normalizedCanonicalSlug}${suffix}`) {
-			return 6;
-		}
-	}
-	if (normalizedAaSlug === normalizedCanonicalSlug) {
-		return 5;
-	}
-	const effortSuffixes = [
-		["-xhigh", 5],
-		["-high", 4],
-		["-medium", 3],
-		["-low", 2],
-		["-minimal", 1],
-	] as const;
-	for (const [suffix, priority] of effortSuffixes) {
-		if (normalizedAaSlug === `${normalizedCanonicalSlug}${suffix}`) {
-			return priority;
-		}
-	}
-	return 0;
+    if (aaSlug == null || canonicalSlug == null) {
+        return 0;
+    }
+    const normalizedAaSlug = normalizeProviderModelId(aaSlug);
+    const normalizedCanonicalSlug = normalizeProviderModelId(canonicalSlug);
+    for (const suffix of EPHEMERAL_SUFFIXES) {
+        if (normalizedAaSlug === `${normalizedCanonicalSlug}${suffix}`) {
+            return 6;
+        }
+    }
+    if (normalizedAaSlug === normalizedCanonicalSlug) {
+        return 5;
+    }
+    const effortSuffixes = [
+        ["-xhigh", 5],
+        ["-high", 4],
+        ["-medium", 3],
+        ["-low", 2],
+        ["-minimal", 1],
+    ] as const;
+    for (const [suffix, priority] of effortSuffixes) {
+        if (normalizedAaSlug === `${normalizedCanonicalSlug}${suffix}`) {
+            return priority;
+        }
+    }
+    return 0;
 }
 /** Compute a priority score for OpenRouter enrichment LLM stats selection. */
 
 function rowPriority(row: JsonObject, normalizedId: string): number {
-	const providerId = row.provider_id;
-	const openrouterBoost = providerId === PRIMARY_PROVIDER_ID ? 1_000_000 : 0;
-	const intelligenceCostBoost = hasIntelligenceCost(row) ? 1_000 : 0;
-	const scoreSignalBoost = hasScoreSignal(row) ? 10 : 0;
-	const aaSlug = typeof row.aa_slug === "string" ? row.aa_slug : null;
-	const canonicalSlug = modelSlugFromModelId(normalizedId);
-	const reasoningEffortBoost =
-		reasoningEffortPriority(aaSlug, canonicalSlug) * 10_000_000;
-	return (
-		reasoningEffortBoost +
-		openrouterBoost +
-		intelligenceCostBoost +
-		scoreSignalBoost
-	);
+    const providerId = row.provider_id;
+    const openrouterBoost = providerId === PRIMARY_PROVIDER_ID ? 1_000_000 : 0;
+    const intelligenceCostBoost = hasIntelligenceCost(row) ? 1_000 : 0;
+    const scoreSignalBoost = hasScoreSignal(row) ? 10 : 0;
+    const aaSlug = typeof row.aa_slug === "string" ? row.aa_slug : null;
+    const canonicalSlug = modelSlugFromModelId(normalizedId);
+    const reasoningEffortBoost =
+        reasoningEffortPriority(aaSlug, canonicalSlug) * 10_000_000;
+    return (
+        reasoningEffortBoost +
+        openrouterBoost +
+        intelligenceCostBoost +
+        scoreSignalBoost
+    );
 }
 /** Deduplicate OpenRouter enrichment LLM stats selection rows while preferring OpenRouter data. */
 
 function dedupeRowsPreferOpenRouter(
-	rows: Record<string, unknown>[],
+    rows: Record<string, unknown>[],
 ): Record<string, unknown>[] {
-	const groupedByNormalizedId = new Map<string, JsonObject[]>();
-	const passthrough: Record<string, unknown>[] = [];
+    const groupedByNormalizedId = new Map<string, JsonObject[]>();
+    const passthrough: Record<string, unknown>[] = [];
 
-	for (const row of rows) {
-		const rowRecord = asRecord(row);
-		const id = typeof rowRecord.id === "string" ? rowRecord.id : null;
-		if (!id) {
-			passthrough.push(row);
-			continue;
-		}
-		const key = normalizeProviderModelId(id);
-		const group = groupedByNormalizedId.get(key) ?? [];
-		group.push(rowRecord);
-		groupedByNormalizedId.set(key, group);
-	}
+    for (const row of rows) {
+        const rowRecord = asRecord(row);
+        const id = typeof rowRecord.id === "string" ? rowRecord.id : null;
+        if (!id) {
+            passthrough.push(row);
+            continue;
+        }
+        const key = normalizeProviderModelId(id);
+        const group = groupedByNormalizedId.get(key) ?? [];
+        group.push(rowRecord);
+        groupedByNormalizedId.set(key, group);
+    }
 
-	const dedupedRows: JsonObject[] = [];
-	for (const [normalizedId, group] of groupedByNormalizedId.entries()) {
-		const winner = [...group].sort(
-			(left, right) =>
-				rowPriority(right, normalizedId) - rowPriority(left, normalizedId),
-		)[0] as JsonObject;
-		const mergedIntelligenceIndexCost: JsonObject = {
-			...asRecord(winner.intelligence_index_cost),
-		};
-		for (const candidate of group) {
-			const candidateCost = asRecord(candidate.intelligence_index_cost);
-			for (const [key, value] of Object.entries(candidateCost)) {
-				if (mergedIntelligenceIndexCost[key] == null && value != null) {
-					mergedIntelligenceIndexCost[key] = value;
-				}
-			}
-		}
-		dedupedRows.push({
-			...winner,
-			intelligence_index_cost: mergedIntelligenceIndexCost,
-		});
-	}
+    const dedupedRows: JsonObject[] = [];
+    for (const [normalizedId, group] of groupedByNormalizedId.entries()) {
+        const winner = [...group].sort(
+            (left, right) =>
+                rowPriority(right, normalizedId) -
+                rowPriority(left, normalizedId),
+        )[0] as JsonObject;
+        const mergedIntelligenceIndexCost: JsonObject = {
+            ...asRecord(winner.intelligence_index_cost),
+        };
+        for (const candidate of group) {
+            const candidateCost = asRecord(candidate.intelligence_index_cost);
+            for (const [key, value] of Object.entries(candidateCost)) {
+                if (mergedIntelligenceIndexCost[key] == null && value != null) {
+                    mergedIntelligenceIndexCost[key] = value;
+                }
+            }
+        }
+        dedupedRows.push({
+            ...winner,
+            intelligence_index_cost: mergedIntelligenceIndexCost,
+        });
+    }
 
-	return [...passthrough, ...dedupedRows];
+    return [...passthrough, ...dedupedRows];
 }
 /** Helper for non free model id. */
 
 function nonFreeModelId(modelId: string): string | null {
-	return modelId.endsWith(":free") ? modelId.slice(0, -":free".length) : null;
+    return modelId.endsWith(":free") ? modelId.slice(0, -":free".length) : null;
 }
 /** Return whether positive cost fields is true. */
 
 function hasPositiveCostFields(cost: JsonObject): boolean {
-	const input = asFiniteNumber(cost.input);
-	const output = asFiniteNumber(cost.output);
-	return input != null && input > 0 && output != null && output > 0;
+    const input = asFiniteNumber(cost.input);
+    const output = asFiniteNumber(cost.output);
+    return input != null && input > 0 && output != null && output > 0;
 }
 /** Backfill missing free-model costs for OpenRouter enrichment LLM stats selection. */
 
 function backfillFreeModelCosts(
-	rows: Record<string, unknown>[],
+    rows: Record<string, unknown>[],
 ): Record<string, unknown>[] {
-	const nonFreeCostById = new Map<string, JsonObject>();
-	for (const row of rows) {
-		const rowRecord = asRecord(row);
-		const id = typeof rowRecord.id === "string" ? rowRecord.id : null;
-		if (!id || id.endsWith(":free")) {
-			continue;
-		}
-		const cost = asRecord(rowRecord.cost);
-		if (hasPositiveCostFields(cost)) {
-			nonFreeCostById.set(id, cost);
-		}
-	}
+    const nonFreeCostById = new Map<string, JsonObject>();
+    for (const row of rows) {
+        const rowRecord = asRecord(row);
+        const id = typeof rowRecord.id === "string" ? rowRecord.id : null;
+        if (!id || id.endsWith(":free")) {
+            continue;
+        }
+        const cost = asRecord(rowRecord.cost);
+        if (hasPositiveCostFields(cost)) {
+            nonFreeCostById.set(id, cost);
+        }
+    }
 
-	return rows.map((row) => {
-		const rowRecord = asRecord(row);
-		const id = typeof rowRecord.id === "string" ? rowRecord.id : null;
-		if (!id) {
-			return row;
-		}
-		const baseId = nonFreeModelId(id);
-		if (!baseId) {
-			return row;
-		}
-		const baseCost = nonFreeCostById.get(baseId);
-		if (!baseCost) {
-			return row;
-		}
-		return {
-			...rowRecord,
-			cost: {
-				...baseCost,
-			},
-		};
-	});
+    return rows.map((row) => {
+        const rowRecord = asRecord(row);
+        const id = typeof rowRecord.id === "string" ? rowRecord.id : null;
+        if (!id) {
+            return row;
+        }
+        const baseId = nonFreeModelId(id);
+        if (!baseId) {
+            return row;
+        }
+        const baseCost = nonFreeCostById.get(baseId);
+        if (!baseCost) {
+            return row;
+        }
+        return {
+            ...rowRecord,
+            cost: {
+                ...baseCost,
+            },
+        };
+    });
 }
 /** Build the open router data by id. */
 
 async function buildOpenRouterDataById(
-	rows: Record<string, unknown>[],
-	speedConcurrency: number,
+    rows: Record<string, unknown>[],
+    speedConcurrency: number,
 ): Promise<{
-	speedById: Map<string, JsonObject>;
-	pricingById: Map<string, JsonObject>;
+    speedById: Map<string, JsonObject>;
+    pricingById: Map<string, JsonObject>;
 }> {
-	const modelIds = rows
-		.map((row) => asRecord(row).id)
-		.filter((id): id is string => typeof id === "string" && id.length > 0);
-	if (modelIds.length === 0) {
-		return {
-			speedById: new Map(),
-			pricingById: new Map(),
-		};
-	}
+    const modelIds = rows
+        .map((row) => asRecord(row).id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+    if (modelIds.length === 0) {
+        return {
+            speedById: new Map(),
+            pricingById: new Map(),
+        };
+    }
 
-	try {
-		const payload = await getOpenRouterScrapedStats({
-			modelIds,
-			concurrency: speedConcurrency,
-		});
-		const speedById = new Map(
-			payload.models.map((model) => [
-				model.id,
-				normalizeOpenRouterSpeed(model.performance),
-			]),
-		);
-		const pricingById = new Map(
-			payload.models.map((model) => [
-				model.id,
-				normalizeOpenRouterPricing(model.pricing),
-			]),
-		);
-		return { speedById, pricingById };
-	} catch {
-		return {
-			speedById: new Map(),
-			pricingById: new Map(),
-		};
-	}
+    try {
+        const payload = await getOpenRouterScrapedStats({
+            modelIds,
+            concurrency: speedConcurrency,
+        });
+        const speedById = new Map(
+            payload.models.map((model) => [
+                model.id,
+                normalizeOpenRouterSpeed(model.performance),
+            ]),
+        );
+        const pricingById = new Map(
+            payload.models.map((model) => [
+                model.id,
+                normalizeOpenRouterPricing(model.pricing),
+            ]),
+        );
+        return { speedById, pricingById };
+    } catch {
+        return {
+            speedById: new Map(),
+            pricingById: new Map(),
+        };
+    }
 }
 
 /** Fetch OpenRouter enrichments for the matched rows and return the late-bound speed/pricing maps. */
 export async function enrichRows(
-	matchedRows: Record<string, unknown>[],
-	openrouterConfig: OpenRouterConfig,
-	scoringConfig: ScoringConfig,
+    matchedRows: Record<string, unknown>[],
+    openrouterConfig: OpenRouterConfig,
+    scoringConfig: ScoringConfig,
 ): Promise<EnrichedRows> {
-	const dedupedRows = dedupeRowsPreferOpenRouter(matchedRows);
-	const rows = backfillFreeModelCosts(dedupedRows);
-	const { speedById: openRouterSpeedById, pricingById: openRouterPricingById } =
-		await buildOpenRouterDataById(rows, openrouterConfig.speedConcurrency);
-	const speedOutputTokenAnchors = deriveSpeedOutputTokenAnchors(
-		openRouterSpeedById,
-		scoringConfig,
-	);
-	return {
-		rows,
-		openRouterSpeedById,
-		openRouterPricingById,
-		speedOutputTokenAnchors,
-	};
+    const dedupedRows = dedupeRowsPreferOpenRouter(matchedRows);
+    const rows = backfillFreeModelCosts(dedupedRows);
+    const {
+        speedById: openRouterSpeedById,
+        pricingById: openRouterPricingById,
+    } = await buildOpenRouterDataById(rows, openrouterConfig.speedConcurrency);
+    const speedOutputTokenAnchors = deriveSpeedOutputTokenAnchors(
+        openRouterSpeedById,
+        scoringConfig,
+    );
+    return {
+        rows,
+        openRouterSpeedById,
+        openRouterPricingById,
+        speedOutputTokenAnchors,
+    };
 }
