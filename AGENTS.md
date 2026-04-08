@@ -36,8 +36,8 @@
 
 ## Project-specific conventions and rationale
 
-- Preserve model defaults and env var names to maintain Python parity.
-- Keep runtime provider wiring on `src/clients/openai.ts` with `OPENAI_API_KEY` and `OPENAI_BASE_URL`; do not reintroduce `@langchain/openrouter` during upstream merges.
+- Preserve model defaults and env var names to maintain Python parity unless a requested runtime config change intentionally diverges.
+- Keep runtime provider wiring on `src/clients/openai.ts` with `LLM_API_KEY` and `LLM_BASE_URL`; do not reintroduce `@langchain/openrouter` during upstream merges.
 - Keep naming idiomatic in TS (`camelCase`) while retaining behavior contracts from Python.
 - Keep provider-specific request shaping in `clients/*`, not in agents.
 - Keep external API calls isolated to `tools/*`.

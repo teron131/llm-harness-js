@@ -22,12 +22,14 @@ npm run typecheck
 
 ## Runtime configuration
 
-Set your OpenAI-compatible credentials before invoking chat or embedding clients:
+Set the active runtime pair before invoking chat or embedding clients:
 
 ```bash
-export OPENAI_API_KEY="..."
-export OPENAI_BASE_URL="https://your-openai-compatible-endpoint/v1"
+export LLM_API_KEY="..."
+export LLM_BASE_URL="https://your-openai-compatible-endpoint/v1"
 ```
+
+`LLM_API_KEY` and `LLM_BASE_URL` are the only runtime env vars the code reads for OpenAI-compatible clients.
 
 The runtime provider wiring uses the repo-local `ChatOpenAI` and `OpenAIEmbeddings` wrappers in `src/clients/openai.ts`.
 

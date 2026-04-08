@@ -37,7 +37,7 @@
 
 ## Project-specific conventions and rationale
 
-- Keep env var names stable (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`).
+- Keep env var names stable (`LLM_API_KEY`, `LLM_BASE_URL`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`).
 - Keep runtime wiring on `openai.ts` after upstream merges; do not reintroduce `@langchain/openrouter` or OpenRouter-only plugin paths.
 - Preserve parser fallback order to avoid provider-specific regressions.
 - Keep provider-specific request logic inside client modules, not agent modules.

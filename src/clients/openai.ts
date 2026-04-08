@@ -14,13 +14,13 @@ type ClientOptions = {
     configuration?: Record<string, unknown>;
 } & Record<string, unknown>;
 
-/** Apply OPENAI_* environment defaults to an OpenAI-compatible client config. */
+/** Apply LLM_* environment defaults to an OpenAI-compatible client config. */
 function applyOpenAIEnvironment<T extends ClientOptions>(options: T): T {
     const nextOptions = { ...options };
-    const baseURL = process.env.OPENAI_BASE_URL;
+    const baseURL = process.env.LLM_BASE_URL;
 
-    if (process.env.OPENAI_API_KEY && nextOptions.apiKey === undefined) {
-        nextOptions.apiKey = process.env.OPENAI_API_KEY;
+    if (process.env.LLM_API_KEY && nextOptions.apiKey === undefined) {
+        nextOptions.apiKey = process.env.LLM_API_KEY;
     }
 
     const configuration = nextOptions.configuration ?? {};
