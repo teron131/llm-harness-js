@@ -490,7 +490,9 @@ async function fetchBestAvailableModelStats(
 			) {
 				return resolvedModel;
 			}
-		} catch {}
+		} catch {
+			// Try the next permaslug candidate when one stats request fails.
+		}
 	}
 
 	return firstResolved ?? emptyScrapedModel(modelId);

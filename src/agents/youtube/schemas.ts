@@ -18,29 +18,6 @@ export const SummarySchema = z.object({
 });
 
 export type Summary = z.output<typeof SummarySchema>;
-/** Helper for summary to text. */
-
-function summaryToText(summary: Summary): string {
-	const lines = [
-		"=".repeat(80),
-		"SUMMARY:",
-		"=".repeat(80),
-		`\nOverview:\n${summary.overview}`,
-		`\nChapters (${summary.chapters.length}):`,
-	];
-
-	summary.chapters.forEach((chapter, i) => {
-		lines.push(`\n  Chapter ${i + 1}: ${chapter.title}`);
-		lines.push(`    Summary: ${chapter.description}`);
-		if (chapter.start_time || chapter.end_time) {
-			lines.push(
-				`    Time: ${chapter.start_time ?? "?"} - ${chapter.end_time ?? "?"}`,
-			);
-		}
-	});
-
-	return lines.join("\n");
-}
 
 export const GarbageIdentificationSchema = z.object({
 	garbage_ranges: z.array(TagRangeSchema),

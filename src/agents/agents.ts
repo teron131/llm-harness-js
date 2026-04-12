@@ -14,6 +14,20 @@ import { summarizeVideo as summarizeVideoGemini } from "./youtube/summarizer-gem
 import { summarizeVideo as summarizeVideoReact } from "./youtube/summarizer-react.js";
 
 type GenericTool = ClientTool | ServerTool;
+type AgentModel = ReturnType<typeof ChatOpenAI>;
+type AgentInstance = ReturnType<typeof createAgent>;
+type AgentInvokeInput = Parameters<AgentInstance["invoke"]>[0];
+type ExaAnswerClient = {
+	answer(
+		query: string,
+		options: {
+			systemPrompt: string;
+			text: true;
+			outputSchema: unknown;
+		},
+	): Promise<{ answer: unknown }>;
+};
+type ExaConstructor = new (apiKey?: string) => ExaAnswerClient;
 type AgentResponse<T extends ZodTypeAny | null> = {
 	messages: unknown[];
 	structuredResponse?: T extends ZodTypeAny ? z.output<T> : never;
@@ -24,14 +38,15 @@ type AgentOutput<T extends ZodTypeAny | null> = T extends ZodTypeAny
 /** Exa Agent for Agent model orchestration. */
 
 export class ExaAgent<T extends ZodTypeAny> {
-	private readonly exa: any;
+	private readonly exa: ExaAnswerClient;
 	private readonly systemPrompt: string;
 	private readonly outputSchema: T;
 
 	constructor(systemPrompt: string, outputSchema: T) {
 		this.systemPrompt = systemPrompt;
 		this.outputSchema = outputSchema;
-		this.exa = new (Exa as any)(process.env.EXA_API_KEY);
+		const ExaClient = Exa as unknown as ExaConstructor;
+		this.exa = new ExaClient(process.env.EXA_API_KEY);
 	}
 
 	async invoke(query: string): Promise<z.output<T>> {
@@ -48,7 +63,7 @@ export class ExaAgent<T extends ZodTypeAny> {
 
 export class BaseHarnessAgent<T extends ZodTypeAny | null = null> {
 	protected readonly agent: ReturnType<typeof createAgent>;
-	protected readonly model: any;
+	protected readonly model: AgentModel;
 	protected readonly responseFormat: T | undefined;
 
 	constructor({
@@ -84,23 +99,32 @@ export class BaseHarnessAgent<T extends ZodTypeAny | null = null> {
 
 		this.responseFormat = responseFormat;
 
-		const agentParams: {
-			model: unknown;
-			tools: GenericTool[];
-			systemPrompt?: string;
-			responseFormat?: T;
-		} = {
+		const baseAgentParams = {
 			model: this.model,
 			tools: [...tools],
 		};
-		if (systemPrompt !== undefined) {
-			agentParams.systemPrompt = systemPrompt;
-		}
 		if (this.responseFormat) {
-			agentParams.responseFormat = this.responseFormat;
+			this.agent =
+				systemPrompt !== undefined
+					? createAgent({
+							...baseAgentParams,
+							systemPrompt,
+							responseFormat: this.responseFormat,
+						})
+					: createAgent({
+							...baseAgentParams,
+							responseFormat: this.responseFormat,
+						});
+			return;
 		}
 
-		this.agent = createAgent(agentParams as any);
+		this.agent =
+			systemPrompt !== undefined
+				? createAgent({
+						...baseAgentParams,
+						systemPrompt,
+					})
+				: createAgent(baseAgentParams);
 	}
 
 	protected processResponse(response: AgentResponse<T>): AgentOutput<T> {
@@ -138,7 +162,7 @@ export class WebLoaderAgent<
 	async invoke(userInput: string): Promise<AgentOutput<T>> {
 		const response = (await this.agent.invoke({
 			messages: [{ role: "user", content: userInput }],
-		} as any)) as AgentResponse<T>;
+		} as AgentInvokeInput)) as AgentResponse<T>;
 		return this.processResponse(response);
 	}
 }
@@ -157,7 +181,7 @@ export class ImageAnalysisAgent<
 		});
 		const response = (await this.agent.invoke({
 			messages: [mediaMessage],
-		} as any)) as AgentResponse<T>;
+		} as AgentInvokeInput)) as AgentResponse<T>;
 		return this.processResponse(response);
 	}
 }

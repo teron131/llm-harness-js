@@ -94,7 +94,12 @@ export function parseSingleFilePatchWithStats(args: {
 		throw new Error("Patch must update exactly one file.");
 	}
 
-	const filePatch = validateSingleFilePatch(filePatches[0]!, args.target_path);
+	const firstFilePatch = filePatches[0];
+	if (!firstFilePatch) {
+		throw new Error("Patch must update exactly one file.");
+	}
+
+	const filePatch = validateSingleFilePatch(firstFilePatch, args.target_path);
 	return [filePatch, collectPatchStats(filePatches)];
 }
 

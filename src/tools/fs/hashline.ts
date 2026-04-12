@@ -15,7 +15,6 @@ const HASHLINE_OPERATION_VALUES = [
 ] as const;
 
 const HashlineOperationSchema = z.enum(HASHLINE_OPERATION_VALUES);
-type HashlineOperation = z.infer<typeof HashlineOperationSchema>;
 
 export const HashlineEditSchema = z
 	.object({
