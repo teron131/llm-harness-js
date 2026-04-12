@@ -1,5 +1,5 @@
 {
-    "printWidth": 80,
-    "trailingComma": "all",
-    "proseWrap": "preserve"
+	"printWidth": 80,
+	"trailingComma": "all",
+	"proseWrap": "preserve"
 }

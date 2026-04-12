@@ -7,46 +7,43 @@ import sharp from "sharp";
 /** Load an image file from disk. */
 
 async function loadImage(imageSource: string): Promise<Buffer> {
-    if (
-        imageSource.startsWith("http://") ||
-        imageSource.startsWith("https://")
-    ) {
-        const response = await fetch(imageSource);
-        if (!response.ok) {
-            throw new Error(
-                `Failed to fetch image: ${response.status} ${response.statusText}`,
-            );
-        }
-        return Buffer.from(await response.arrayBuffer());
-    }
+	if (imageSource.startsWith("http://") || imageSource.startsWith("https://")) {
+		const response = await fetch(imageSource);
+		if (!response.ok) {
+			throw new Error(
+				`Failed to fetch image: ${response.status} ${response.statusText}`,
+			);
+		}
+		return Buffer.from(await response.arrayBuffer());
+	}
 
-    return readFile(imageSource);
+	return readFile(imageSource);
 }
 /** Load an image file as a base64 string. */
 
 export async function loadImageBase64(
-    imageSource: string,
-    maxSize: [number, number] = [768, 768],
-    format: "jpeg" | "png" | "webp" = "jpeg",
+	imageSource: string,
+	maxSize: [number, number] = [768, 768],
+	format: "jpeg" | "png" | "webp" = "jpeg",
 ): Promise<string> {
-    const imageBuffer = await loadImage(imageSource);
-    const [maxWidth, maxHeight] = maxSize;
+	const imageBuffer = await loadImage(imageSource);
+	const [maxWidth, maxHeight] = maxSize;
 
-    let pipeline = sharp(imageBuffer).resize({
-        width: maxWidth,
-        height: maxHeight,
-        fit: "inside",
-        withoutEnlargement: false,
-    });
+	let pipeline = sharp(imageBuffer).resize({
+		width: maxWidth,
+		height: maxHeight,
+		fit: "inside",
+		withoutEnlargement: false,
+	});
 
-    if (format === "jpeg") {
-        pipeline = pipeline.jpeg();
-    } else if (format === "png") {
-        pipeline = pipeline.png();
-    } else {
-        pipeline = pipeline.webp();
-    }
+	if (format === "jpeg") {
+		pipeline = pipeline.jpeg();
+	} else if (format === "png") {
+		pipeline = pipeline.png();
+	} else {
+		pipeline = pipeline.webp();
+	}
 
-    const result = await pipeline.toBuffer();
-    return result.toString("base64");
+	const result = await pipeline.toBuffer();
+	return result.toString("base64");
 }

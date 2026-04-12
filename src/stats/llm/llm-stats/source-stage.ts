@@ -1,115 +1,112 @@
 /** Source stage for LLM stats: fetch scraper rows, fetch AA API fallback rows, and build lookup maps. */
 
 import {
-    FALLBACK_PROVIDER_IDS,
-    modelSlugFromModelId,
-    PRIMARY_PROVIDER_ID,
+	FALLBACK_PROVIDER_IDS,
+	modelSlugFromModelId,
+	PRIMARY_PROVIDER_ID,
 } from "../shared";
 import { getArtificialAnalysisStats } from "../sources/artificial-analysis-api";
 import { getArtificialAnalysisScrapedEvalsOnlyStats } from "../sources/artificial-analysis-scraper";
 import { getModelsDevStats } from "../sources/models-dev";
 
 import type {
-    ArtificialAnalysisModel,
-    ModelsDevModel,
-    ScrapedEvalModel,
-    SourceData,
+	ArtificialAnalysisModel,
+	ModelsDevModel,
+	ScrapedEvalModel,
+	SourceData,
 } from "./types";
 
 /** Keep one preferred models.dev row per model id with OpenRouter first and trusted providers as fallback. */
 function dedupePreferredProviderModels(
-    modelsDevModels: ModelsDevModel[],
+	modelsDevModels: ModelsDevModel[],
 ): ModelsDevModel[] {
-    const preferredModels = modelsDevModels.filter(
-        (modelsDevModel) =>
-            modelsDevModel.provider_id === PRIMARY_PROVIDER_ID ||
-            FALLBACK_PROVIDER_IDS.has(modelsDevModel.provider_id),
-    );
-    const byModelId = new Map<string, ModelsDevModel>();
-    const withPriority = preferredModels.map((modelsDevModel) => ({
-        modelsDevModel,
-        priority: modelsDevModel.provider_id === PRIMARY_PROVIDER_ID ? 0 : 1,
-    }));
-    withPriority.sort((left, right) => left.priority - right.priority);
-    for (const { modelsDevModel } of withPriority) {
-        byModelId.set(
-            modelsDevModel.model_id,
-            byModelId.get(modelsDevModel.model_id) ?? modelsDevModel,
-        );
-    }
-    return [...byModelId.values()];
+	const preferredModels = modelsDevModels.filter(
+		(modelsDevModel) =>
+			modelsDevModel.provider_id === PRIMARY_PROVIDER_ID ||
+			FALLBACK_PROVIDER_IDS.has(modelsDevModel.provider_id),
+	);
+	const byModelId = new Map<string, ModelsDevModel>();
+	const withPriority = preferredModels.map((modelsDevModel) => ({
+		modelsDevModel,
+		priority: modelsDevModel.provider_id === PRIMARY_PROVIDER_ID ? 0 : 1,
+	}));
+	withPriority.sort((left, right) => left.priority - right.priority);
+	for (const { modelsDevModel } of withPriority) {
+		byModelId.set(
+			modelsDevModel.model_id,
+			byModelId.get(modelsDevModel.model_id) ?? modelsDevModel,
+		);
+	}
+	return [...byModelId.values()];
 }
 /** Build the models dev by id. */
 
 function buildModelsDevById(
-    modelsDevModels: ModelsDevModel[],
+	modelsDevModels: ModelsDevModel[],
 ): Map<string, ModelsDevModel> {
-    return new Map(
-        modelsDevModels.map((modelsDevModel) => [
-            modelsDevModel.model_id,
-            modelsDevModel,
-        ]),
-    );
+	return new Map(
+		modelsDevModels.map((modelsDevModel) => [
+			modelsDevModel.model_id,
+			modelsDevModel,
+		]),
+	);
 }
 /** Build the scraped by slug. */
 
 function buildScrapedBySlug(
-    scrapedRows: unknown[],
+	scrapedRows: unknown[],
 ): Map<string, ScrapedEvalModel> {
-    const scrapedBySlug = new Map<string, ScrapedEvalModel>();
-    for (const scrapedRow of scrapedRows) {
-        const scrapedModel = scrapedRow as ScrapedEvalModel;
-        const artificialAnalysisSlug = modelSlugFromModelId(
-            scrapedModel.model_id,
-        );
-        if (artificialAnalysisSlug) {
-            scrapedBySlug.set(artificialAnalysisSlug, scrapedModel);
-        }
-    }
-    return scrapedBySlug;
+	const scrapedBySlug = new Map<string, ScrapedEvalModel>();
+	for (const scrapedRow of scrapedRows) {
+		const scrapedModel = scrapedRow as ScrapedEvalModel;
+		const artificialAnalysisSlug = modelSlugFromModelId(scrapedModel.model_id);
+		if (artificialAnalysisSlug) {
+			scrapedBySlug.set(artificialAnalysisSlug, scrapedModel);
+		}
+	}
+	return scrapedBySlug;
 }
 /** Build the api by slug. */
 
 function buildApiBySlug(
-    artificialAnalysisModels: ArtificialAnalysisModel[],
+	artificialAnalysisModels: ArtificialAnalysisModel[],
 ): Map<string, ArtificialAnalysisModel> {
-    return new Map(
-        artificialAnalysisModels
-            .map(
-                (model) =>
-                    [
-                        typeof model.slug === "string" && model.slug.length > 0
-                            ? model.slug
-                            : null,
-                        model,
-                    ] as const,
-            )
-            .filter(
-                (entry): entry is [string, ArtificialAnalysisModel] =>
-                    entry[0] != null,
-            ),
-    );
+	return new Map(
+		artificialAnalysisModels
+			.map(
+				(model) =>
+					[
+						typeof model.slug === "string" && model.slug.length > 0
+							? model.slug
+							: null,
+						model,
+					] as const,
+			)
+			.filter(
+				(entry): entry is [string, ArtificialAnalysisModel] => entry[0] != null,
+			),
+	);
 }
 
 /** Fetch the source snapshots and precompute the slug/id maps used by later stages. */
 export async function fetchSourceData(): Promise<SourceData> {
-    const [
-        artificialAnalysisApiStats,
-        artificialAnalysisScrapedStats,
-        modelsDevStats,
-    ] = await Promise.all([
-        getArtificialAnalysisStats(),
-        getArtificialAnalysisScrapedEvalsOnlyStats(),
-        getModelsDevStats(),
-    ]);
-    const preferredModelsDevModels = dedupePreferredProviderModels(
-        modelsDevStats.models,
-    );
-    return {
-        scrapedRows: artificialAnalysisScrapedStats.data,
-        preferredModelsDevModels,
-        modelsDevById: buildModelsDevById(preferredModelsDevModels),
-        apiBySlug: buildApiBySlug(artificialAnalysisApiStats.models),
-        scrapedBySlug: buildScrapedBySlug(artificialAnalysisScrapedStats.data),
-    };
+	const [
+		artificialAnalysisApiStats,
+		artificialAnalysisScrapedStats,
+		modelsDevStats,
+	] = await Promise.all([
+		getArtificialAnalysisStats(),
+		getArtificialAnalysisScrapedEvalsOnlyStats(),
+		getModelsDevStats(),
+	]);
+	const preferredModelsDevModels = dedupePreferredProviderModels(
+		modelsDevStats.models,
+	);
+	return {
+		scrapedRows: artificialAnalysisScrapedStats.data,
+		preferredModelsDevModels,
+		modelsDevById: buildModelsDevById(preferredModelsDevModels),
+		apiBySlug: buildApiBySlug(artificialAnalysisApiStats.models),
+		scrapedBySlug: buildScrapedBySlug(artificialAnalysisScrapedStats.data),
+	};
 }
