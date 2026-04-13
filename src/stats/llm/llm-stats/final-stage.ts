@@ -20,6 +20,7 @@ const EMPTY_OPENROUTER_PRICING = {
 	weighted_output: null,
 } as const;
 const MIN_INTELLIGENCE_COST_TOKEN_THRESHOLD = 1_000_000;
+const MIN_REQUIRED_RELATIVE_SCORE = 10;
 const INTELLIGENCE_COST_TOTAL_COST_KEY = "intelligence_index_cost_total_cost";
 const INTELLIGENCE_COST_TOTAL_TOKENS_KEY =
 	"intelligence_index_cost_total_tokens";
@@ -199,6 +200,28 @@ function sortModelsByIntelligenceRelativeScore(
 		}
 		return (left.id ?? "").localeCompare(right.id ?? "");
 	});
+}
+/** Return whether the model has the minimum score signal needed for the public list. */
+
+function hasMinimumScoreSignal(model: ModelStatsSelectedModel): boolean {
+	const relativeScores = asRecord(model.relative_scores);
+	const requiredKeys = [
+		"overall_score",
+		"intelligence_score",
+		"agentic_score",
+		"speed_score",
+	];
+	return requiredKeys.every((key) => {
+		const value = asFiniteNumber(relativeScores[key]);
+		return value != null && value >= MIN_REQUIRED_RELATIVE_SCORE;
+	});
+}
+/** Filter out low-signal models from the public list. */
+
+function filterLowSignalModels(
+	models: ModelStatsSelectedModel[],
+): ModelStatsSelectedModel[] {
+	return models.filter(hasMinimumScoreSignal);
 }
 /** Return whether plain object is true. */
 
@@ -416,9 +439,9 @@ export function buildFinalModels(
 		),
 	);
 	const modelsWithRelativeScores = attachRelativeScores(models);
-	const sortedModels = sortModelsByIntelligenceRelativeScore(
-		modelsWithRelativeScores,
-	);
+	const scoreFilteredModels = filterLowSignalModels(modelsWithRelativeScores);
+	const sortedModels =
+		sortModelsByIntelligenceRelativeScore(scoreFilteredModels);
 	const prunedModels = pruneSparseFields(sortedModels, finalConfig);
 	return filterModelsById(prunedModels, id);
 }

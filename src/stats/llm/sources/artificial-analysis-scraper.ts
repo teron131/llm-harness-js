@@ -5,7 +5,7 @@ import { asRecord, type JsonObject } from "../shared";
 
 const DEFAULT_SCRAPE_URL = "https://artificialanalysis.ai/leaderboards/models";
 const DEFAULT_TIMEOUT_MS = 30_000;
-const ROW_DETECTION_KEY = "intelligence_index";
+const ROW_DETECTION_KEY = "intelligenceIndex";
 const SPARSE_COLUMN_NULL_RATIO = 0.5;
 const MODEL_SEARCH_BACKTRACK_CHARS = 20_000;
 const MIN_INTELLIGENCE_COST_TOKEN_THRESHOLD = 1_000_000;
@@ -59,7 +59,11 @@ function toAbsoluteAaLogoUrl(value: unknown): string | null {
 	if (value.startsWith("http://") || value.startsWith("https://")) {
 		return value;
 	}
-	const normalized = value.startsWith("/") ? value : `/${value}`;
+	const normalized = value.startsWith("/")
+		? value
+		: value.includes("/")
+			? `/${value}`
+			: `/img/logos/${value}`;
 	return `https://artificialanalysis.ai${normalized}`;
 }
 
@@ -71,14 +75,54 @@ const EVALUATION_EXCLUDED_KEYS = new Set([
 	"omniscience",
 	"omniscience_accuracy",
 	"omniscience_hallucination_rate",
-	"intelligence_index_is_estimated",
-	"intelligence_index",
-	"agentic_index",
-	"coding_index",
-	"intelligence_index_per_m_output_tokens",
-	"intelligence_index_cost",
+	"omniscienceAccuracy",
+	"omniscienceNonHallucination",
+	"intelligenceIndex",
+	"intelligenceIndexIsEstimated",
+	"agenticIndex",
+	"codingIndex",
+	"intelligenceIndexCostTotal",
+	"intelligenceIndexCostInput",
+	"intelligenceIndexCostOutput",
+	"intelligenceIndexCostReasoning",
+	"intelligenceIndexCostAnswer",
 ]);
 const NO_COLUMN_VALUE = Symbol("no_column_value");
+/** Return the first numeric value from the provided row keys. */
+
+function firstNumber(row: JsonObject, keys: string[]): number | null {
+	for (const key of keys) {
+		if (typeof row[key] === "number") {
+			return row[key];
+		}
+	}
+	return null;
+}
+/** Return the first boolean value from the provided row keys. */
+
+function firstBoolean(row: JsonObject, keys: string[]): boolean | null {
+	for (const key of keys) {
+		if (typeof row[key] === "boolean") {
+			return row[key];
+		}
+	}
+	return null;
+}
+/** Return the first string value from the provided row keys. */
+
+function firstString(row: JsonObject, keys: string[]): string | null {
+	for (const key of keys) {
+		if (typeof row[key] === "string" && row[key].length > 0) {
+			return row[key];
+		}
+	}
+	return null;
+}
+/** Convert current and legacy AA metric keys into the stable snake_case payload keys. */
+
+function normalizeMetricKey(key: string): string {
+	return key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+}
 /** Select the relevant score fields for Artificial Analysis scraper. */
 
 function pickEvaluations(row: JsonObject): JsonObject {
@@ -94,7 +138,7 @@ function pickEvaluations(row: JsonObject): JsonObject {
 			continue;
 		}
 		if (typeof value === "number" || typeof value === "boolean") {
-			evaluations[key] = value;
+			evaluations[normalizeMetricKey(key)] = value;
 		}
 	}
 	return evaluations;
@@ -102,85 +146,55 @@ function pickEvaluations(row: JsonObject): JsonObject {
 /** Select the relevant score fields for Artificial Analysis scraper. */
 
 function pickIntelligence(row: JsonObject): JsonObject {
-	const intelligence: JsonObject = {
-		intelligence_index:
-			typeof row.intelligence_index === "number"
-				? row.intelligence_index
-				: null,
-		agentic_index:
-			typeof row.agentic_index === "number" ? row.agentic_index : null,
-		coding_index:
-			typeof row.coding_index === "number" ? row.coding_index : null,
-		omniscience_index:
-			typeof row.omniscience === "number" ? row.omniscience : null,
-		omniscience_accuracy: null,
-		omniscience_nonhallucination_rate: null,
-	};
-	const omniscienceBreakdown = asRecord(row.omniscience_breakdown);
+	const omniscienceBreakdown = asRecord(row.omniscienceBreakdown);
 	const omniscienceTotal = asRecord(omniscienceBreakdown.total);
-	if (typeof omniscienceTotal.accuracy === "number") {
-		intelligence.omniscience_accuracy = omniscienceTotal.accuracy;
+	const hallucinationRate = firstNumber(omniscienceTotal, [
+		"hallucinationRate",
+	]);
+	const intelligence: JsonObject = {
+		intelligence_index: firstNumber(row, ["intelligenceIndex"]),
+		agentic_index: firstNumber(row, ["agenticIndex"]),
+		coding_index: firstNumber(row, ["codingIndex"]),
+		omniscience_index: firstNumber(row, ["omniscience"]),
+		omniscience_accuracy: firstNumber(row, ["omniscienceAccuracy"]),
+		omniscience_nonhallucination_rate: firstNumber(row, [
+			"omniscienceNonHallucination",
+		]),
+	};
+	if (intelligence.omniscience_accuracy == null) {
+		intelligence.omniscience_accuracy = firstNumber(omniscienceTotal, [
+			"accuracy",
+		]);
 	}
-	if (typeof omniscienceTotal.hallucination_rate === "number") {
-		intelligence.omniscience_nonhallucination_rate =
-			omniscienceTotal.hallucination_rate;
+	if (
+		intelligence.omniscience_nonhallucination_rate == null &&
+		hallucinationRate != null
+	) {
+		intelligence.omniscience_nonhallucination_rate = 1 - hallucinationRate;
 	}
 	return intelligence;
 }
 /** Select the relevant score fields for Artificial Analysis scraper. */
 
 function pickIntelligenceIndexCost(row: JsonObject): JsonObject {
-	const intelligenceTokenCounts = asRecord(row.intelligence_index_token_counts);
-	const intelligenceIndexCost = asRecord(row.intelligence_index_cost);
-	const inputTokens =
-		typeof intelligenceTokenCounts.input_tokens === "number"
-			? intelligenceTokenCounts.input_tokens
-			: typeof row.total_input_tokens_api === "number"
-				? row.total_input_tokens_api
-				: typeof row.input_tokens === "number"
-					? row.input_tokens
-					: null;
-	const outputTokens =
-		typeof intelligenceTokenCounts.output_tokens === "number"
-			? intelligenceTokenCounts.output_tokens
-			: null;
-	const answerTokens =
-		typeof intelligenceTokenCounts.answer_tokens === "number"
-			? intelligenceTokenCounts.answer_tokens
-			: null;
-	const reasoningTokens =
-		typeof intelligenceTokenCounts.reasoning_tokens === "number"
-			? intelligenceTokenCounts.reasoning_tokens
-			: null;
+	const intelligenceTokenCounts = asRecord(row.intelligenceIndexTokenCounts);
+	const inputTokens = firstNumber(intelligenceTokenCounts, ["inputTokens"]);
+	const outputTokens = firstNumber(intelligenceTokenCounts, ["outputTokens"]);
+	const answerTokens = firstNumber(intelligenceTokenCounts, ["answerTokens"]);
+	const reasoningTokens = firstNumber(intelligenceTokenCounts, [
+		"reasoningTokens",
+	]);
 	const outputFromParts =
 		(answerTokens ?? 0) + (reasoningTokens ?? 0) > 0
 			? (answerTokens ?? 0) + (reasoningTokens ?? 0)
 			: null;
-	const totalTokens =
-		outputTokens ??
-		outputFromParts ??
-		(typeof row.total_answer_tokens_api === "number"
-			? row.total_answer_tokens_api
-			: null) ??
-		(typeof row.output_tokens === "number" ? row.output_tokens : null);
+	const totalTokens = outputTokens ?? outputFromParts;
 
 	return {
-		input_cost:
-			typeof intelligenceIndexCost.input_cost === "number"
-				? intelligenceIndexCost.input_cost
-				: null,
-		reasoning_cost:
-			typeof intelligenceIndexCost.reasoning_cost === "number"
-				? intelligenceIndexCost.reasoning_cost
-				: null,
-		output_cost:
-			typeof intelligenceIndexCost.output_cost === "number"
-				? intelligenceIndexCost.output_cost
-				: null,
-		total_cost:
-			typeof intelligenceIndexCost.total_cost === "number"
-				? intelligenceIndexCost.total_cost
-				: null,
+		input_cost: firstNumber(row, ["intelligenceIndexCostInput"]),
+		reasoning_cost: firstNumber(row, ["intelligenceIndexCostReasoning"]),
+		output_cost: firstNumber(row, ["intelligenceIndexCostOutput"]),
+		total_cost: firstNumber(row, ["intelligenceIndexCostTotal"]),
 		input_tokens: inputTokens,
 		reasoning_tokens: reasoningTokens,
 		answer_tokens: answerTokens,
@@ -276,6 +290,22 @@ function getRowIdentifier(row: JsonObject): string | null {
 	}
 	return null;
 }
+/** Return whether a parsed object looks like a leaderboard model row. */
+
+function isLeaderboardModelRow(row: JsonObject): boolean {
+	if (!(ROW_DETECTION_KEY in row)) {
+		return false;
+	}
+	const slug = firstString(row, ["slug"]);
+	const name = firstString(row, ["name", "shortName", "short_name"]);
+	const creatorSlug = firstString(row, ["modelCreatorSlug"]);
+	const creatorName =
+		firstString(row, ["modelCreatorName"]) ??
+		firstString(asRecord(row.creator), ["name"]);
+	return (
+		slug != null && name != null && (creatorSlug != null || creatorName != null)
+	);
+}
 /** Flatten nested rows for Artificial Analysis scraper. */
 
 function flattenExpandedRow(row: JsonObject): JsonObject {
@@ -348,6 +378,36 @@ function dropMostlyNullColumns(
 		),
 	);
 }
+/** Filter rows to mirror the page's default "Status: Current" behavior. */
+
+function filterDeprecatedRows(rows: JsonObject[]): JsonObject[] {
+	return rows.filter((row) => row.deprecated !== true);
+}
+/** Sort rows to mirror the leaderboard's default intelligence-first order. */
+
+function sortLeaderboardRows(rows: JsonObject[]): JsonObject[] {
+	return [...rows].sort((left, right) => {
+		const leftIntelligence = firstNumber(left, ["intelligenceIndex"]);
+		const rightIntelligence = firstNumber(right, ["intelligenceIndex"]);
+		if (leftIntelligence == null && rightIntelligence == null) {
+			return (firstString(left, ["slug"]) ?? "").localeCompare(
+				firstString(right, ["slug"]) ?? "",
+			);
+		}
+		if (leftIntelligence == null) {
+			return 1;
+		}
+		if (rightIntelligence == null) {
+			return -1;
+		}
+		if (leftIntelligence !== rightIntelligence) {
+			return rightIntelligence - leftIntelligence;
+		}
+		return (firstString(left, ["slug"]) ?? "").localeCompare(
+			firstString(right, ["slug"]) ?? "",
+		);
+	});
+}
 
 type RowSelectionContext = {
 	creator: JsonObject;
@@ -365,7 +425,7 @@ function getProviderSlug(row: JsonObject, creator: JsonObject): string | null {
 			? creator.name
 			: typeof row.provider === "string"
 				? row.provider
-				: null;
+				: firstString(row, ["modelCreatorName", "modelCreatorSlug"]);
 	if (providerName == null) {
 		return null;
 	}
@@ -374,22 +434,37 @@ function getProviderSlug(row: JsonObject, creator: JsonObject): string | null {
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-+|-+$/g, "");
 }
+/** Build a creator-like object from flat row fields when AA inlines creator data. */
+
+function flatCreatorFromRow(row: JsonObject): JsonObject {
+	return {
+		name: firstString(row, ["modelCreatorName"]),
+		slug: firstString(row, ["modelCreatorSlug"]),
+		logo: firstString(row, ["modelCreatorLogo"]),
+		color: firstString(row, ["modelCreatorColor"]),
+	};
+}
 /** Build a row-selection context for Artificial Analysis scraper. */
 
 function buildRowSelectionContext(row: JsonObject): RowSelectionContext {
-	const creator = asRecord(row.creator);
-	const modelCreators = asRecord(row.model_creators);
+	const creator = {
+		...flatCreatorFromRow(row),
+		...asRecord(row.creator),
+	};
+	const modelCreators = {
+		...flatCreatorFromRow(row),
+		...asRecord(row.model_creators),
+	};
 	const providerSlug = getProviderSlug(row, creator);
-	const modelSlug =
-		typeof row.slug === "string" && row.slug.length > 0 ? row.slug : null;
+	const modelSlug = firstString(row, ["slug"]);
 	const creatorSlug =
-		typeof modelCreators.slug === "string" && modelCreators.slug.length > 0
-			? modelCreators.slug
-			: providerSlug;
+		firstString(modelCreators, ["slug"]) ??
+		firstString(creator, ["slug"]) ??
+		providerSlug;
 	const modelUrlSlug =
 		typeof row.model_url === "string"
 			? row.model_url.replace(/^\/models\//, "")
-			: null;
+			: modelSlug;
 	return {
 		creator,
 		modelCreators,
@@ -403,22 +478,22 @@ function buildRowSelectionContext(row: JsonObject): RowSelectionContext {
 
 function selectModalities(row: JsonObject, type: "input" | "output"): string[] {
 	return [
-		row[`${type}_modality_text`] ? "text" : null,
-		row[`${type}_modality_image`] ? "image" : null,
-		row[`${type}_modality_video`] ? "video" : null,
-		row[`${type}_modality_speech`] ? "speech" : null,
+		row[`${type}_modality_text`] || row[`${type}ModalityText`] ? "text" : null,
+		row[`${type}_modality_image`] || row[`${type}ModalityImage`]
+			? "image"
+			: null,
+		row[`${type}_modality_video`] || row[`${type}ModalityVideo`]
+			? "video"
+			: null,
+		row[`${type}_modality_speech`] || row[`${type}ModalitySpeech`]
+			? "speech"
+			: null,
 	].filter((value): value is string => value != null);
 }
 /** Select the preferred Artificial Analysis scraper values. */
 
 function selectReasoningFlag(row: JsonObject): boolean | null {
-	if (typeof row.reasoning_model === "boolean") {
-		return row.reasoning_model;
-	}
-	if (typeof row.isReasoning === "boolean") {
-		return row.isReasoning;
-	}
-	return null;
+	return firstBoolean(row, ["reasoningModel"]);
 }
 /** Return the selected column value for Artificial Analysis scraper. */
 
@@ -442,7 +517,13 @@ function getSelectedColumnValue(
 				? `${providerSlug}/${modelSlug}`
 				: (modelSlug ?? row.id ?? null);
 		case "model_url":
-			return row.model_url ?? (typeof row.id === "string" ? row.id : null);
+			return (
+				row.model_url ??
+				(creatorSlug && modelSlug
+					? `/models/${creatorSlug}/${modelSlug}`
+					: null) ??
+				(typeof row.id === "string" ? row.id : null)
+			);
 		case "model_id":
 			return creatorSlug && modelUrlSlug
 				? `${creatorSlug}/${modelUrlSlug}`
@@ -469,6 +550,7 @@ function getSelectedColumnValue(
 					row.logo_url ??
 					row.logoSmall ??
 					row.logo_small ??
+					row.modelCreatorLogo ??
 					modelCreators.logo_small_url ??
 					modelCreators.logo_url ??
 					modelCreators.logo_small ??
@@ -482,7 +564,10 @@ function getSelectedColumnValue(
 			return (
 				Boolean(row.input_modality_image) ||
 				Boolean(row.input_modality_video) ||
-				Boolean(row.input_modality_speech)
+				Boolean(row.input_modality_speech) ||
+				Boolean(row.inputModalityImage) ||
+				Boolean(row.inputModalityVideo) ||
+				Boolean(row.inputModalitySpeech)
 			);
 		case "reasoning":
 		case "reasoning_model":
@@ -492,51 +577,40 @@ function getSelectedColumnValue(
 		case "output_modalities":
 			return selectModalities(row, "output");
 		case "release_date":
-			return typeof row.release_date === "string" ? row.release_date : null;
+			return firstString(row, ["releaseDate"]);
 		case "input_tokens": {
 			const intelligenceTokenCounts = asRecord(
-				row.intelligence_index_token_counts,
+				row.intelligenceIndexTokenCounts,
 			);
-			return (
-				intelligenceTokenCounts.input_tokens ??
-				row.total_input_tokens_api ??
-				row.input_tokens ??
-				null
-			);
+			return intelligenceTokenCounts.inputTokens ?? null;
 		}
 		case "output_tokens": {
 			const intelligenceTokenCounts = asRecord(
-				row.intelligence_index_token_counts,
+				row.intelligenceIndexTokenCounts,
 			);
-			const answerTokens =
-				typeof intelligenceTokenCounts.answer_tokens === "number"
-					? intelligenceTokenCounts.answer_tokens
-					: null;
-			const reasoningTokens =
-				typeof intelligenceTokenCounts.reasoning_tokens === "number"
-					? intelligenceTokenCounts.reasoning_tokens
-					: null;
+			const answerTokens = firstNumber(intelligenceTokenCounts, [
+				"answerTokens",
+			]);
+			const reasoningTokens = firstNumber(intelligenceTokenCounts, [
+				"reasoningTokens",
+			]);
 			const outputFromParts =
 				(answerTokens ?? 0) + (reasoningTokens ?? 0) > 0
 					? (answerTokens ?? 0) + (reasoningTokens ?? 0)
 					: null;
-			return (
-				intelligenceTokenCounts.output_tokens ??
-				outputFromParts ??
-				row.total_answer_tokens_api ??
-				row.output_tokens ??
-				null
-			);
+			return intelligenceTokenCounts.outputTokens ?? outputFromParts ?? null;
 		}
 		case "median_speed":
 			return (
 				row.median_output_speed ??
+				row.medianOutputTokensPerSecond ??
 				asRecord(row.timescaleData).median_output_speed ??
 				null
 			);
 		case "median_time":
 			return (
 				row.median_time_to_first_chunk ??
+				row.medianTimeToFirstTokenSeconds ??
 				asRecord(row.timescaleData).median_time_to_first_chunk ??
 				null
 			);
@@ -582,16 +656,15 @@ function selectColumns(
 /** Extract the rows from corpus. */
 
 function extractRowsFromCorpus(corpus: string): JsonObject[] {
-	const detectionToken = `"${ROW_DETECTION_KEY}":`;
 	const rowsById = new Map<string, JsonObject>();
 
 	let cursor = 0;
 	while (true) {
-		const hitIndex = corpus.indexOf(detectionToken, cursor);
+		const hitIndex = corpus.indexOf(`"${ROW_DETECTION_KEY}":`, cursor);
 		if (hitIndex === -1) {
 			break;
 		}
-		cursor = hitIndex + detectionToken.length;
+		cursor = hitIndex + 1;
 
 		const searchStart = Math.max(0, hitIndex - MODEL_SEARCH_BACKTRACK_CHARS);
 		for (let backIndex = hitIndex; backIndex >= searchStart; backIndex -= 1) {
@@ -630,7 +703,10 @@ export function processArtificialAnalysisScrapedRows(
 	const shouldDropMostlyNullColumns = options.dropMostlyNullColumns ?? true;
 	const selectedColumns = options.selectedColumns ?? [];
 
-	const normalizedRows = shouldFlatten ? rows.map(flattenExpandedRow) : rows;
+	const currentRows = sortLeaderboardRows(filterDeprecatedRows(rows));
+	const normalizedRows = shouldFlatten
+		? currentRows.map(flattenExpandedRow)
+		: currentRows;
 	const cleanedRows = shouldDropMostlyNullColumns
 		? dropMostlyNullColumns(normalizedRows, SPARSE_COLUMN_NULL_RATIO)
 		: normalizedRows;
@@ -655,7 +731,11 @@ export async function getArtificialAnalysisScrapedRawStats(
 		}
 		const pageHtml = await response.text();
 		const corpus = extractFlightCorpus(pageHtml);
-		const data = extractRowsFromCorpus(corpus);
+		const data = sortLeaderboardRows(
+			filterDeprecatedRows(
+				extractRowsFromCorpus(corpus).filter(isLeaderboardModelRow),
+			),
+		);
 
 		return {
 			fetched_at_epoch_seconds: nowEpochSeconds(),

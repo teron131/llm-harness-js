@@ -20,6 +20,22 @@ npm run build
 npm run typecheck
 ```
 
+## LLM Stats Table
+
+Print the current LLM stats payload as a terminal table:
+
+```bash
+bun run stats:table
+```
+
+Useful flags:
+
+```bash
+bun run stats:table -- --top 15
+bun run stats:table -- --id google/gemini-3.1-pro-preview
+bun run stats:table -- --cached
+```
+
 ## Runtime configuration
 
 Set the active runtime pair before invoking chat or embedding clients:
