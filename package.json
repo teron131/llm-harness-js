@@ -20,8 +20,8 @@
 		"stats:parity": "bun ./scripts/run-stats-parity-snapshot.mjs",
 		"lint": "eslint . --max-warnings=0",
 		"lint:fix": "eslint . --fix",
-		"format": "prettier --write .",
-		"format:check": "prettier --check .",
+		"format": "git ls-files -z -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.jsonc' | xargs -0 biome format --write",
+		"format:check": "git ls-files -z -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.jsonc' | xargs -0 biome format",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest",
@@ -45,11 +45,11 @@
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {
+		"@biomejs/biome": "^2.4.11",
 		"@eslint/js": "^10.0.1",
 		"@types/node": "^25.5.2",
 		"eslint": "^10.2.0",
 		"globals": "^17.4.0",
-		"prettier": "^3.8.1",
 		"typescript": "^6.0.2",
 		"typescript-eslint": "^8.58.1",
 		"vitest": "^4.1.3"
