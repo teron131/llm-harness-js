@@ -11,13 +11,16 @@ import { enrichRows } from "./llm-stats/openrouter-stage";
 import { fetchSourceData } from "./llm-stats/source-stage";
 import type {
 	LlmStatsStageConfig,
+	ModelStatsSelectedMetadata,
 	ModelStatsSelectedModel,
 	ModelStatsSelectedOptions,
 	ModelStatsSelectedPayload,
 } from "./llm-stats/types";
+import { asRecord } from "./shared";
 
 export type {
 	LlmStatsStageConfig,
+	ModelStatsSelectedMetadata,
 	ModelStatsSelectedModel,
 	ModelStatsSelectedOptions,
 	ModelStatsSelectedPayload,
@@ -65,6 +68,72 @@ const LLM_STATS_STAGE_CONFIG = {
 	},
 } satisfies LlmStatsStageConfig;
 
+function sortedUniqueKeys(values: Iterable<string>): string[] {
+	return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+function keysFromModelField(
+	models: Array<Record<string, unknown> | ModelStatsSelectedModel>,
+	field: "evaluations" | "intelligence",
+): string[] {
+	return sortedUniqueKeys(
+		models.flatMap((model) => Object.keys(asRecord(model[field]))),
+	);
+}
+
+function buildModelStatsSelectedMetadata(
+	models: Array<Record<string, unknown> | ModelStatsSelectedModel>,
+	scoringConfig: LlmStatsStageConfig["scoring"],
+): ModelStatsSelectedMetadata {
+	const availableEvaluationKeys = keysFromModelField(models, "evaluations");
+	const availableIntelligenceKeys = keysFromModelField(models, "intelligence");
+	const availableBenchmarkKeys = sortedUniqueKeys([
+		...availableEvaluationKeys,
+		...availableIntelligenceKeys,
+	]);
+	const selectedBenchmarkKeys = sortedUniqueKeys([
+		...scoringConfig.intelligenceBenchmarkKeys,
+		...scoringConfig.agenticBenchmarkKeys,
+	]);
+	return {
+		artificial_analysis: {
+			available_benchmark_keys: availableBenchmarkKeys,
+			available_evaluation_keys: availableEvaluationKeys,
+			available_intelligence_keys: availableIntelligenceKeys,
+		},
+		scoring: {
+			intelligence_benchmark_keys: [...scoringConfig.intelligenceBenchmarkKeys],
+			missing_intelligence_benchmark_keys:
+				scoringConfig.intelligenceBenchmarkKeys.filter(
+					(key) => !availableBenchmarkKeys.includes(key),
+				),
+			agentic_benchmark_keys: [...scoringConfig.agenticBenchmarkKeys],
+			missing_agentic_benchmark_keys: scoringConfig.agenticBenchmarkKeys.filter(
+				(key) => !availableBenchmarkKeys.includes(key),
+			),
+			selected_benchmark_keys: selectedBenchmarkKeys,
+		},
+	};
+}
+
+function withModelStatsSelectedMetadata(
+	payload: Omit<ModelStatsSelectedPayload, "metadata"> &
+		Partial<Pick<ModelStatsSelectedPayload, "metadata">>,
+	modelsForMetadata: Array<
+		Record<string, unknown> | ModelStatsSelectedModel
+	> = payload.models,
+): ModelStatsSelectedPayload {
+	return {
+		...payload,
+		metadata:
+			payload.metadata ??
+			buildModelStatsSelectedMetadata(
+				modelsForMetadata,
+				LLM_STATS_STAGE_CONFIG.scoring,
+			),
+	};
+}
+
 /** Persist the final model stats payload to disk while keeping write failures non-fatal. */
 export async function saveModelStatsSelected(
 	payload: ModelStatsSelectedPayload,
@@ -75,10 +144,10 @@ export async function saveModelStatsSelected(
 
 /** Return an empty selected LLM stats payload for failure-safe fallback paths. */
 function emptyModelStatsSelectedPayload(): ModelStatsSelectedPayload {
-	return {
+	return withModelStatsSelectedMetadata({
 		fetched_at_epoch_seconds: null,
 		models: [],
-	};
+	});
 }
 
 /** Build the selected LLM stats payload from the live pipeline. */
@@ -102,10 +171,13 @@ async function buildModelStatsSelectedPayload(
 		LLM_STATS_STAGE_CONFIG.scoring,
 	);
 	const fetchedAt = currentEpochSeconds();
-	return {
-		fetched_at_epoch_seconds: fetchedAt,
-		models,
-	};
+	return withModelStatsSelectedMetadata(
+		{
+			fetched_at_epoch_seconds: fetchedAt,
+			models,
+		},
+		enrichedRows.rows,
+	);
 }
 
 /** Build the selected LLM stats payload with configurable cache policy. */
@@ -119,7 +191,7 @@ async function getModelStatsSelectedPayload(
 			const cachedPayload =
 				await loadModelStatsSelectedFromCache(DEFAULT_OUTPUT_PATH);
 			if (cachedPayload) {
-				return cachedPayload;
+				return withModelStatsSelectedMetadata(cachedPayload);
 			}
 		}
 

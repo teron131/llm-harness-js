@@ -37,9 +37,26 @@ export type ModelStatsSelectedModel = {
 	relative_scores: unknown;
 };
 
+/** Public metadata that keeps the AA benchmark universe and current scoring selections visible at the API boundary. */
+export type ModelStatsSelectedMetadata = {
+	artificial_analysis: {
+		available_benchmark_keys: string[];
+		available_evaluation_keys: string[];
+		available_intelligence_keys: string[];
+	};
+	scoring: {
+		intelligence_benchmark_keys: string[];
+		missing_intelligence_benchmark_keys: string[];
+		agentic_benchmark_keys: string[];
+		missing_agentic_benchmark_keys: string[];
+		selected_benchmark_keys: string[];
+	};
+};
+
 /** Final model stats payload returned by the public stats API, with `null` fetch time when the pipeline fails safely. */
 export type ModelStatsSelectedPayload = {
 	fetched_at_epoch_seconds: number | null;
+	metadata: ModelStatsSelectedMetadata;
 	models: ModelStatsSelectedModel[];
 };
 
