@@ -2,8 +2,8 @@
 
 export { fixFile, fixText } from "./fixer.js";
 export {
-	DEFAULT_FIXER_TASK_PROMPT,
 	DEFAULT_FIXER_SYSTEM_PROMPT,
+	DEFAULT_FIXER_TASK_PROMPT,
 } from "./prompts.js";
 export {
 	DEFAULT_FIXER_MAX_ITERATIONS,

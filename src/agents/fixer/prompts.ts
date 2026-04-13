@@ -1,7 +1,7 @@
 /** Prompt builders for the generic file fixer workflow. */
 
 export const DEFAULT_FIXER_TASK_PROMPT =
-  "Fix grammar, spelling, and obvious typos while preserving meaning and structure.";
+	"Fix grammar, spelling, and obvious typos while preserving meaning and structure.";
 
 export const DEFAULT_FIXER_SYSTEM_PROMPT = `Edit the file directly to satisfy the task.
 
@@ -20,64 +20,64 @@ Hard constraints:
 
 export const CLEAN_TASK_LOG = "DONE:\n- clean\nREMAINING:\n- none";
 export const ALLOWED_FIXER_ACTIONS = [
-  "ADD",
-  "ALIGN",
-  "DEDUPE",
-  "FILL",
-  "FIX",
-  "MERGE",
-  "NORMALIZE",
-  "REMOVE",
-  "REORDER",
-  "SPLIT",
-  "TRIM",
+	"ADD",
+	"ALIGN",
+	"DEDUPE",
+	"FILL",
+	"FIX",
+	"MERGE",
+	"NORMALIZE",
+	"REMOVE",
+	"REORDER",
+	"SPLIT",
+	"TRIM",
 ] as const;
 export const HIGH_PRIORITY_FIXER_ACTIONS = [
-  "FIX",
-  "ADD",
-  "REMOVE",
-  "MERGE",
-  "FILL",
-  "SPLIT",
-  "DEDUPE",
+	"FIX",
+	"ADD",
+	"REMOVE",
+	"MERGE",
+	"FILL",
+	"SPLIT",
+	"DEDUPE",
 ] as const;
 export const LOW_PRIORITY_FIXER_ACTIONS = [
-  "NORMALIZE",
-  "REORDER",
-  "ALIGN",
-  "TRIM",
+	"NORMALIZE",
+	"REORDER",
+	"ALIGN",
+	"TRIM",
 ] as const;
 
 const FIXER_ACTION_MEANINGS: Record<
-  (typeof ALLOWED_FIXER_ACTIONS)[number],
-  string
+	(typeof ALLOWED_FIXER_ACTIONS)[number],
+	string
 > = {
-  FIX: "correct incorrect existing text or values",
-  ADD: "insert a small missing local value, delimiter, field, or line when the current file clearly shows where it belongs",
-  REMOVE: "delete stray, broken, or duplicate text",
-  MERGE: "consolidate repeated or split content into one correct form",
-  FILL: "populate an obviously missing local value when the current file provides enough evidence",
-  NORMALIZE: "align nearby formatting or consistency without broad rewriting",
-  SPLIT: "separate wrongly combined local content into distinct correct parts",
-  REORDER:
-    "reorder nearby local items only when the current file itself makes the correct order clear",
-  DEDUPE: "remove duplicated local content while keeping one correct copy",
-  ALIGN:
-    "make nearby sibling fields or entries follow the same local pattern when the correct pattern is already present",
-  TRIM: "remove clearly extraneous surrounding whitespace or punctuation without changing meaning",
+	FIX: "correct incorrect existing text or values",
+	ADD: "insert a small missing local value, delimiter, field, or line when the current file clearly shows where it belongs",
+	REMOVE: "delete stray, broken, or duplicate text",
+	MERGE: "consolidate repeated or split content into one correct form",
+	FILL: "populate an obviously missing local value when the current file provides enough evidence",
+	NORMALIZE: "align nearby formatting or consistency without broad rewriting",
+	SPLIT: "separate wrongly combined local content into distinct correct parts",
+	REORDER:
+		"reorder nearby local items only when the current file itself makes the correct order clear",
+	DEDUPE: "remove duplicated local content while keeping one correct copy",
+	ALIGN:
+		"make nearby sibling fields or entries follow the same local pattern when the correct pattern is already present",
+	TRIM: "remove clearly extraneous surrounding whitespace or punctuation without changing meaning",
 };
 
 export function buildFixerAgentPrompt({
-  targetFile,
-  fixerContext = "",
-  maxTurns,
+	targetFile,
+	fixerContext = "",
+	maxTurns,
 }: {
-  targetFile: string;
-  fixerContext?: string;
-  maxTurns: number;
+	targetFile: string;
+	fixerContext?: string;
+	maxTurns: number;
 }) {
-  const contextBlock = fixerContext ? `\nContext:\n${fixerContext}\n` : "";
-  return `Work on /${targetFile.replace(/^\/+/, "")} directly.
+	const contextBlock = fixerContext ? `\nContext:\n${fixerContext}\n` : "";
+	return `Work on /${targetFile.replace(/^\/+/, "")} directly.
 
 Fix as many obvious safe issues as you can per pass.
 Prefer fewer, higher-yield passes over many tiny passes.
@@ -86,22 +86,22 @@ Stay within ${maxTurns} passes.${contextBlock}`;
 }
 
 export function buildFixerPassPrompt({
-  targetFile,
-  currentText,
-  passNumber,
-  maxTurns,
-  taskLog = "",
+	targetFile,
+	currentText,
+	passNumber,
+	maxTurns,
+	taskLog = "",
 }: {
-  targetFile: string;
-  currentText: string;
-  passNumber: number;
-  maxTurns: number;
-  taskLog?: string;
+	targetFile: string;
+	currentText: string;
+	passNumber: number;
+	maxTurns: number;
+	taskLog?: string;
 }) {
-  const taskLogBlock = taskLog ? `\nCurrent task log:\n${taskLog}\n` : "";
-  const passesRemaining = maxTurns - passNumber + 1;
-  const normalizedTarget = targetFile.replace(/^\/+/, "");
-  return `Pass ${passNumber} for /${normalizedTarget}.
+	const taskLogBlock = taskLog ? `\nCurrent task log:\n${taskLog}\n` : "";
+	const passesRemaining = maxTurns - passNumber + 1;
+	const normalizedTarget = targetFile.replace(/^\/+/, "");
+	return `Pass ${passNumber} for /${normalizedTarget}.
 
 Keep working until the file satisfies the task. Do not stop just because you fixed one issue if visible remaining work still exists.
 Fix all obvious issues you can confidently resolve in this pass, not just the first one you notice.
@@ -130,16 +130,16 @@ ${currentText}`;
 }
 
 export function buildFixerProgressPrompt({
-  targetFile,
-  currentText,
+	targetFile,
+	currentText,
 }: {
-  targetFile: string;
-  currentText: string;
+	targetFile: string;
+	currentText: string;
 }) {
-  const actionMeanings = ALLOWED_FIXER_ACTIONS.map(
-    (action) => `  ${action} = ${FIXER_ACTION_MEANINGS[action]}`,
-  ).join("\n");
-  return `Update a tiny progress checklist for /${targetFile.replace(/^\/+/, "")}.
+	const actionMeanings = ALLOWED_FIXER_ACTIONS.map(
+		(action) => `  ${action} = ${FIXER_ACTION_MEANINGS[action]}`,
+	).join("\n");
+	return `Update a tiny progress checklist for /${targetFile.replace(/^\/+/, "")}.
 
 Use the current file text only.
 Judge the current file against the active system prompt for this fixer run.
@@ -181,29 +181,29 @@ ${currentText}`;
 }
 
 export function buildReviewSystemPrompt(systemPrompt: string) {
-  return `${systemPrompt}
+	return `${systemPrompt}
 
 For this call, do not rewrite the file. Return only the compact checklist requested by the user prompt.`;
 }
 
 export function buildHashlineRepairSystemPrompt(systemPrompt: string) {
-  return `${systemPrompt}
+	return `${systemPrompt}
 
 The previous hashline edit plan failed to apply. Return only a corrected, smaller JSON hashline edit response for the same file.`;
 }
 
 export function buildHashlineRepairPrompt({
-  errorText,
-  taskLog,
-  currentText,
-  attemptedEdits,
+	errorText,
+	taskLog,
+	currentText,
+	attemptedEdits,
 }: {
-  errorText: string;
-  taskLog: string;
-  currentText: string;
-  attemptedEdits: string;
+	errorText: string;
+	taskLog: string;
+	currentText: string;
+	attemptedEdits: string;
 }) {
-  return `Hashline apply error:
+	return `Hashline apply error:
 ${errorText}
 
 Correct the edit plan against the current hashline-formatted file contents.

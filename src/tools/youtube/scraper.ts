@@ -284,6 +284,19 @@ export async function youtubeLoader(url: string): Promise<string> {
 	return formatYoutubeLoaderOutput(result);
 }
 
+export const scrapeYoutubeTool = tool(
+	async ({ youtubeUrl }: { youtubeUrl: string }): Promise<string> =>
+		getTranscript(youtubeUrl),
+	{
+		name: "scrape_youtube_tool",
+		description:
+			"Scrape a YouTube video and return the parsed transcript text.",
+		schema: z.object({
+			youtubeUrl: z.string(),
+		}),
+	},
+);
+
 export const youtubeloaderTool = tool(
 	async ({ url }: { url: string }): Promise<string> => youtubeLoader(url),
 	{
