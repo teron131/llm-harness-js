@@ -3,6 +3,7 @@
 export {
 	BaseHarnessAgent,
 	ExaAgent,
+	FixerAgent,
 	ImageAnalysisAgent,
 	WebLoaderAgent,
 	YouTubeSummarizer,

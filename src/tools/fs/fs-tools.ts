@@ -43,7 +43,7 @@ const EDIT_WITH_ED_SCHEMA = z.object({
 	script: z.string(),
 });
 
-class SandboxFS {
+export class SandboxFS {
 	readonly rootDir: string;
 
 	constructor(rootDir: string) {

@@ -13,9 +13,11 @@ export { youtubeLoader, youtubeloaderTool } from "../tools/youtube/index.js";
 export {
 	BaseHarnessAgent,
 	ExaAgent,
+	FixerAgent,
 	ImageAnalysisAgent,
 	WebLoaderAgent,
 	YouTubeSummarizer,
 	YouTubeSummarizerGemini,
 	YouTubeSummarizerReAct,
 } from "./agents.js";
+export * from "./fixer/index.js";

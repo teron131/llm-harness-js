@@ -44,8 +44,12 @@ export const HashlineEditSchema = z
 	});
 
 export type HashlineEdit = z.infer<typeof HashlineEditSchema>;
+export const HashlineEditResponseSchema = z.object({
+	edits: z.array(HashlineEditSchema).default([]),
+});
+export type HashlineEditResponse = z.infer<typeof HashlineEditResponseSchema>;
 
-class HashlineReferenceError extends Error {
+export class HashlineReferenceError extends Error {
 	/** Raised when a hashline ref cannot be resolved against the current file text. */
 	constructor(message: string) {
 		super(message);

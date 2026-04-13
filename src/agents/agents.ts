@@ -8,6 +8,9 @@ import type { ZodTypeAny, z } from "zod";
 import { MediaMessage } from "../clients/multimodal.js";
 import { ChatOpenAI } from "../clients/openai.js";
 import { webloaderTool } from "../tools/web/webloader.js";
+import { fixFile as runFixFile, fixText as runFixText } from "./fixer/fixer.js";
+import { DEFAULT_FIXER_TASK_PROMPT } from "./fixer/prompts.js";
+import { DEFAULT_FIXER_MAX_ITERATIONS } from "./fixer/state.js";
 import type { Summary } from "./youtube/schemas.js";
 import { summarizeVideo as summarizeVideoLite } from "./youtube/summarizer.js";
 import { summarizeVideo as summarizeVideoGemini } from "./youtube/summarizer-gemini.js";
@@ -183,6 +186,82 @@ export class ImageAnalysisAgent<
 			messages: [mediaMessage],
 		} as AgentInvokeInput)) as AgentResponse<T>;
 		return this.processResponse(response);
+	}
+}
+/** High-level fixer for either raw text or a file on disk. */
+
+export class FixerAgent {
+	private readonly model?: string;
+	private readonly systemPrompt?: string;
+	readonly defaultPrompt: string;
+	readonly maxIterations: number;
+	readonly restoreBestOnFailure: boolean;
+
+	constructor({
+		model,
+		systemPrompt,
+		defaultPrompt = DEFAULT_FIXER_TASK_PROMPT,
+		maxIterations = DEFAULT_FIXER_MAX_ITERATIONS,
+		restoreBestOnFailure = true,
+	}: {
+		model?: string;
+		systemPrompt?: string;
+		defaultPrompt?: string;
+		maxIterations?: number;
+		restoreBestOnFailure?: boolean;
+	} = {}) {
+		this.model = model;
+		this.systemPrompt = systemPrompt;
+		this.defaultPrompt = defaultPrompt;
+		this.maxIterations = maxIterations;
+		this.restoreBestOnFailure = restoreBestOnFailure;
+	}
+
+	private resolveContext(context?: string) {
+		return context || this.defaultPrompt;
+	}
+
+	async invoke(
+		target: string,
+		options: { context?: string } = {},
+	): Promise<string> {
+		try {
+			const { stat } = await import("node:fs/promises");
+			const pathStat = await stat(target);
+			if (pathStat.isFile()) {
+				return this.fixFile(target, options);
+			}
+		} catch {
+			// Fall back to treating the target as raw text.
+		}
+		return this.fixText(target, options);
+	}
+
+	async fixFile(
+		path: string,
+		{ context }: { context?: string } = {},
+	): Promise<string> {
+		const { readFile } = await import("node:fs/promises");
+		await runFixFile({
+			path,
+			fixerModel: this.model,
+			fixerContext: this.resolveContext(context),
+			fixerSystemPrompt: this.systemPrompt,
+			maxIterations: this.maxIterations,
+			restoreBestOnFailure: this.restoreBestOnFailure,
+		});
+		return readFile(path, "utf-8");
+	}
+
+	fixText(text: string, { context }: { context?: string } = {}) {
+		return runFixText({
+			text,
+			fixerModel: this.model,
+			fixerContext: this.resolveContext(context),
+			fixerSystemPrompt: this.systemPrompt,
+			maxIterations: this.maxIterations,
+			restoreBestOnFailure: this.restoreBestOnFailure,
+		});
 	}
 }
 /** ReAct summarizer wrapper for YouTube transcript workflows. */
