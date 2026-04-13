@@ -1,32 +1,10 @@
 /** Artificial Analysis API source helpers. */
 
-import { add, mean, multiply } from "mathjs";
-import {
-	fetchWithTimeout,
-	finiteNumbers,
-	nowEpochSeconds,
-	percentileRank,
-} from "../../utils";
+import { fetchWithTimeout, nowEpochSeconds } from "../../utils";
 
 const MODELS_URL = "https://artificialanalysis.ai/api/v2/data/llms/models";
-const LOOKBACK_DAYS = 365;
 const REQUEST_TIMEOUT_MS = 30_000;
-const BENCHMARK_KEYS = [
-	"hle",
-	"terminalbench_hard",
-	"lcr",
-	"ifbench",
-	"scicode",
-] as const;
 
-const SCORE_WEIGHTS = {
-	intelligence: 0.3,
-	benchmark_bias: 0.3,
-	price: 0.2,
-	speed: 0.2,
-} as const;
-
-type NumberOrNull = number | null;
 type ModelCreator = {
 	name?: string;
 	slug?: string;
@@ -43,46 +21,20 @@ type Evaluations = {
 	[key: string]: unknown;
 };
 
-type Pricing = {
-	price_1m_blended_3_to_1?: number | null;
-	price_1m_input_tokens?: number | null;
-	price_1m_output_tokens?: number | null;
-	[key: string]: unknown;
-};
-
 type BaseModel = {
 	name?: string;
 	slug?: string;
 	release_date?: string;
 	model_creator?: ModelCreator;
 	evaluations?: Evaluations;
-	pricing?: Pricing;
-	median_output_tokens_per_second?: number | null;
-	median_time_to_first_token_seconds?: number | null;
-	median_time_to_first_answer_token?: number | null;
 	[key: string]: unknown;
 };
 
-type Scores = {
-	overall_score: NumberOrNull;
-	intelligence_score: NumberOrNull;
-	benchmark_bias_score: NumberOrNull;
-	price_score: NumberOrNull;
-	speed_score: NumberOrNull;
-};
-
-type Percentiles = {
-	overall_percentile: NumberOrNull;
-	intelligence_percentile: NumberOrNull;
-	speed_percentile: NumberOrNull;
-	price_percentile: NumberOrNull;
-};
-
-type ScoredModel = BaseModel & { scores: Scores };
-
-type ArtificialAnalysisEnrichedModel = BaseModel & {
-	scores: Scores;
-	percentiles: Percentiles;
+type ArtificialAnalysisModel = {
+	name: string | null;
+	slug: string | null;
+	release_date: string | null;
+	evaluations: Evaluations | null;
 };
 
 type SourcePayload = {
@@ -92,7 +44,7 @@ type SourcePayload = {
 };
 
 /**
- * Ranked and enriched Artificial Analysis models response.
+ * Lean Artificial Analysis models response used by matching and fallback merge paths.
  *
  * When fetching fails, `fetched_at_epoch_seconds` and `status_code` are `null`
  * and `models` is an empty array.
@@ -100,75 +52,15 @@ type SourcePayload = {
 type ArtificialAnalysisOutputPayload = {
 	fetched_at_epoch_seconds: number | null;
 	status_code: number | null;
-	models: ArtificialAnalysisEnrichedModel[];
+	models: ArtificialAnalysisModel[];
 };
 
 /**
  * Artificial Analysis source options.
  */
 export type ArtificialAnalysisOptions = { apiKey?: string };
-/** Compute a finite-aware aggregate for Artificial Analysis API source. */
 
-function meanOfFinite(values: unknown[]): NumberOrNull {
-	const numbers = finiteNumbers(values.filter((value) => value != null));
-	if (numbers.length === 0) {
-		return null;
-	}
-	return Number(mean(numbers));
-}
-/** Return whether the current value is valid for Artificial Analysis API source. */
-
-function isPositiveFinite(value: unknown): boolean {
-	const numericValue = Number(value);
-	return Number.isFinite(numericValue) && numericValue > 0;
-}
-/** Compute a signed logarithmic transform for Artificial Analysis API source. */
-
-function reciprocalLog(value: unknown, invert = false): NumberOrNull {
-	if (!isPositiveFinite(value)) {
-		return null;
-	}
-	const numericValue = Number(value);
-	return invert ? -Math.log10(numericValue) : Math.log10(numericValue);
-}
-/** Compute a finite-aware aggregate for Artificial Analysis API source. */
-
-function weightedMean(
-	pairs: Array<{ value: NumberOrNull; weight: number }>,
-): NumberOrNull {
-	const validPairs = pairs.filter(
-		(pair) =>
-			pair.value != null &&
-			Number.isFinite(pair.value) &&
-			Number.isFinite(pair.weight) &&
-			pair.weight > 0,
-	);
-	if (validPairs.length === 0) {
-		return null;
-	}
-	const weightedSum = validPairs.reduce(
-		(sum, pair) => sum + (pair.value as number) * pair.weight,
-		0,
-	);
-	const weightSum = validPairs.reduce((sum, pair) => sum + pair.weight, 0);
-	if (weightSum === 0) {
-		return null;
-	}
-	return weightedSum / weightSum;
-}
-/** Helper for percentile rank with null. */
-
-function percentileRankWithNull(
-	values: unknown[],
-	value: unknown,
-): NumberOrNull {
-	if (value == null) {
-		return null;
-	}
-	return percentileRank(values, value);
-}
-/** Remove ids from Artificial Analysis API source rows before scoring. */
-
+/** Remove nested `id` fields from Artificial Analysis API rows. */
 function removeIds<T>(value: T): T {
 	if (Array.isArray(value)) {
 		return value.map((item) => removeIds(item)) as T;
@@ -182,117 +74,19 @@ function removeIds<T>(value: T): T {
 	}
 	return value;
 }
-/** Compute score fields for Artificial Analysis API source rows. */
 
-function computeScores(filteredModels: BaseModel[]): ScoredModel[] {
-	return filteredModels.map((model) => {
-		const intelligence = Number(
-			model.evaluations?.artificial_analysis_intelligence_index,
-		);
-		const coding = Number(model.evaluations?.artificial_analysis_coding_index);
-		const blendedPrice = model.pricing?.price_1m_blended_3_to_1;
-		const ttfa = model.median_time_to_first_answer_token;
-		const tps = model.median_output_tokens_per_second;
-
-		const intelligenceRaw =
-			Number.isFinite(intelligence) && Number.isFinite(coding)
-				? Number(add(multiply(2, intelligence), coding))
-				: null;
-		const priceRaw = reciprocalLog(blendedPrice, true);
-		const ttfaRaw = reciprocalLog(ttfa, true);
-		const tpsRaw = reciprocalLog(tps);
-		const intelligenceScore = intelligenceRaw;
-		const benchmarkBiasScore = meanOfFinite(
-			BENCHMARK_KEYS.map((key) => {
-				if (!isPositiveFinite(model.evaluations?.[key])) {
-					return null;
-				}
-				return Number(model.evaluations?.[key]);
-			}),
-		);
-		const priceScore = priceRaw;
-		const speedScore = meanOfFinite([ttfaRaw, tpsRaw]);
-
-		return {
-			...model,
-			scores: {
-				overall_score: weightedMean([
-					{
-						value: intelligenceScore,
-						weight: SCORE_WEIGHTS.intelligence,
-					},
-					{
-						value: benchmarkBiasScore,
-						weight: SCORE_WEIGHTS.benchmark_bias,
-					},
-					{ value: priceScore, weight: SCORE_WEIGHTS.price },
-					{ value: speedScore, weight: SCORE_WEIGHTS.speed },
-				]),
-				intelligence_score: intelligenceScore,
-				benchmark_bias_score: benchmarkBiasScore,
-				price_score: priceScore,
-				speed_score: speedScore,
-			},
-		};
-	});
+/** Project the raw AA API row down to the fields used by this repo. */
+function slimModel(model: BaseModel): ArtificialAnalysisModel {
+	return {
+		name: typeof model.name === "string" ? model.name : null,
+		slug: typeof model.slug === "string" ? model.slug : null,
+		release_date:
+			typeof model.release_date === "string" ? model.release_date : null,
+		evaluations: model.evaluations ?? null,
+	};
 }
-/** Rank the and enrich models. */
 
-function rankAndEnrichModels(
-	models: BaseModel[],
-	cutoffDate: string,
-): ArtificialAnalysisEnrichedModel[] {
-	const filteredModels = models.filter((model) => {
-		return (
-			(model.release_date ?? "") >= cutoffDate &&
-			isPositiveFinite(model.pricing?.price_1m_blended_3_to_1) &&
-			isPositiveFinite(model.pricing?.price_1m_input_tokens) &&
-			isPositiveFinite(model.pricing?.price_1m_output_tokens) &&
-			isPositiveFinite(model.median_time_to_first_answer_token) &&
-			isPositiveFinite(model.median_output_tokens_per_second)
-		);
-	});
-
-	const scoredModels = computeScores(filteredModels);
-	const ranked = scoredModels
-		.filter((model) => Number.isFinite(model.scores.overall_score))
-		.sort(
-			(left, right) =>
-				(right.scores.overall_score ?? Number.NEGATIVE_INFINITY) -
-				(left.scores.overall_score ?? Number.NEGATIVE_INFINITY),
-		);
-
-	const overallValues = ranked.map((model) => model.scores.overall_score);
-	const intelligenceValues = ranked.map(
-		(model) => model.scores.intelligence_score,
-	);
-	const speedValues = ranked.map((model) => model.scores.speed_score);
-	const priceValues = ranked.map((model) => model.scores.price_score);
-
-	return ranked.map((model) => ({
-		...model,
-		percentiles: {
-			overall_percentile: percentileRankWithNull(
-				overallValues,
-				model.scores.overall_score,
-			),
-			intelligence_percentile: percentileRankWithNull(
-				intelligenceValues,
-				model.scores.intelligence_score,
-			),
-			speed_percentile: percentileRankWithNull(
-				speedValues,
-				model.scores.speed_score,
-			),
-			price_percentile: percentileRankWithNull(
-				priceValues,
-				model.scores.price_score,
-			),
-		},
-	}));
-}
-/** Fetch and cache Artificial Analysis API source data. */
-
+/** Fetch raw model rows from the Artificial Analysis API. */
 async function fetchModels(apiKey: string | undefined): Promise<SourcePayload> {
 	if (!apiKey) {
 		throw new Error("Missing ARTIFICIALANALYSIS_API_KEY.");
@@ -311,36 +105,24 @@ async function fetchModels(apiKey: string | undefined): Promise<SourcePayload> {
 	}
 
 	const payload = (await response.json()) as { data: BaseModel[] };
-	const sourcePayload: SourcePayload = {
+	return {
 		fetched_at_epoch_seconds: nowEpochSeconds(),
 		status_code: response.status,
 		models: payload.data.map((model) => removeIds(model)),
 	};
-	return sourcePayload;
 }
 
-/**
- * Fetch, rank, and enrich Artificial Analysis model stats.
- *
- * This API is failure-safe by design and returns an empty payload on errors.
- */
+/** Fetch the lean Artificial Analysis API shape used by this repo. */
 export async function getArtificialAnalysisStats(
 	options: ArtificialAnalysisOptions = {},
 ): Promise<ArtificialAnalysisOutputPayload> {
 	try {
 		const apiKey = options.apiKey ?? process.env.ARTIFICIALANALYSIS_API_KEY;
 		const sourcePayload = await fetchModels(apiKey);
-
-		const cutoffIsoDate = new Date(
-			Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
-		)
-			.toISOString()
-			.slice(0, 10);
-
 		return {
 			fetched_at_epoch_seconds: sourcePayload.fetched_at_epoch_seconds,
 			status_code: sourcePayload.status_code,
-			models: rankAndEnrichModels(sourcePayload.models, cutoffIsoDate),
+			models: sourcePayload.models.map(slimModel),
 		};
 	} catch {
 		return {

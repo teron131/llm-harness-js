@@ -1,18 +1,16 @@
-/** Source stage for LLM stats: fetch scraper rows, fetch AA API fallback rows, and build lookup maps. */
+/** Source stage for LLM stats: fetch Artificial Analysis scraper rows and build lookup maps. */
 
 import {
 	FALLBACK_PROVIDER_IDS,
 	modelSlugFromModelId,
 	PRIMARY_PROVIDER_ID,
 } from "../shared";
-import { getArtificialAnalysisStats } from "../sources/artificial-analysis-api";
 import { getArtificialAnalysisScrapedEvalsOnlyStats } from "../sources/artificial-analysis-scraper";
 import { getModelsDevStats } from "../sources/models-dev";
 
 import type {
 	ArtificialAnalysisModel,
 	ModelsDevModel,
-	ScrapedEvalModel,
 	SourceData,
 } from "./types";
 
@@ -51,51 +49,30 @@ function buildModelsDevById(
 		]),
 	);
 }
-/** Build the scraped by slug. */
+/** Build the Artificial Analysis rows by slug. */
 
-function buildScrapedBySlug(
-	scrapedRows: unknown[],
-): Map<string, ScrapedEvalModel> {
-	const scrapedBySlug = new Map<string, ScrapedEvalModel>();
-	for (const scrapedRow of scrapedRows) {
-		const scrapedModel = scrapedRow as ScrapedEvalModel;
-		const artificialAnalysisSlug = modelSlugFromModelId(scrapedModel.model_id);
+function buildArtificialAnalysisBySlug(
+	artificialAnalysisRows: unknown[],
+): Map<string, ArtificialAnalysisModel> {
+	const artificialAnalysisBySlug = new Map<string, ArtificialAnalysisModel>();
+	for (const artificialAnalysisRow of artificialAnalysisRows) {
+		const artificialAnalysisModel =
+			artificialAnalysisRow as ArtificialAnalysisModel;
+		const artificialAnalysisSlug = modelSlugFromModelId(
+			artificialAnalysisModel.model_id,
+		);
 		if (artificialAnalysisSlug) {
-			scrapedBySlug.set(artificialAnalysisSlug, scrapedModel);
+			artificialAnalysisBySlug.set(
+				artificialAnalysisSlug,
+				artificialAnalysisModel,
+			);
 		}
 	}
-	return scrapedBySlug;
+	return artificialAnalysisBySlug;
 }
-/** Build the api by slug. */
-
-function buildApiBySlug(
-	artificialAnalysisModels: ArtificialAnalysisModel[],
-): Map<string, ArtificialAnalysisModel> {
-	return new Map(
-		artificialAnalysisModels
-			.map(
-				(model) =>
-					[
-						typeof model.slug === "string" && model.slug.length > 0
-							? model.slug
-							: null,
-						model,
-					] as const,
-			)
-			.filter(
-				(entry): entry is [string, ArtificialAnalysisModel] => entry[0] != null,
-			),
-	);
-}
-
 /** Fetch the source snapshots and precompute the slug/id maps used by later stages. */
 export async function fetchSourceData(): Promise<SourceData> {
-	const [
-		artificialAnalysisApiStats,
-		artificialAnalysisScrapedStats,
-		modelsDevStats,
-	] = await Promise.all([
-		getArtificialAnalysisStats(),
+	const [artificialAnalysisScrapedStats, modelsDevStats] = await Promise.all([
 		getArtificialAnalysisScrapedEvalsOnlyStats(),
 		getModelsDevStats(),
 	]);
@@ -103,10 +80,11 @@ export async function fetchSourceData(): Promise<SourceData> {
 		modelsDevStats.models,
 	);
 	return {
-		scrapedRows: artificialAnalysisScrapedStats.data,
+		artificialAnalysisRows: artificialAnalysisScrapedStats.data,
 		preferredModelsDevModels,
 		modelsDevById: buildModelsDevById(preferredModelsDevModels),
-		apiBySlug: buildApiBySlug(artificialAnalysisApiStats.models),
-		scrapedBySlug: buildScrapedBySlug(artificialAnalysisScrapedStats.data),
+		artificialAnalysisBySlug: buildArtificialAnalysisBySlug(
+			artificialAnalysisScrapedStats.data,
+		),
 	};
 }

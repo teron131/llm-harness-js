@@ -12,7 +12,6 @@ import type {
 	ArtificialAnalysisModel,
 	MatcherConfig,
 	ModelsDevModel,
-	ScrapedEvalModel,
 	SourceData,
 } from "./types";
 
@@ -53,25 +52,28 @@ function hasVariantConflict(
 	);
 }
 
-/** Build one matched row from scraper data, then fill missing nested fields from the AA API row when available. */
-function buildMatchedRowFromScrapedModel(
-	scrapedModel: ScrapedEvalModel,
-	apiModel: ArtificialAnalysisModel | null,
+/** Build one matched row from the Artificial Analysis source model. */
+function buildMatchedRowFromArtificialAnalysisModel(
+	artificialAnalysisModel: ArtificialAnalysisModel,
 	matchedModelId: string,
 	modelsDevById: Map<string, ModelsDevModel>,
 ): Record<string, unknown> {
 	const artificialAnalysisModelId =
-		typeof scrapedModel.model_id === "string" ? scrapedModel.model_id : null;
+		typeof artificialAnalysisModel.model_id === "string"
+			? artificialAnalysisModel.model_id
+			: null;
 	const artificialAnalysisSlug = modelSlugFromModelId(
 		artificialAnalysisModelId,
 	);
-	const evaluations = asRecord(scrapedModel.evaluations);
-	const intelligence = asRecord(scrapedModel.intelligence);
-	const intelligenceIndexCost = asRecord(scrapedModel.intelligence_index_cost);
-	const logo = typeof scrapedModel.logo === "string" ? scrapedModel.logo : null;
-	const apiEvaluations = asRecord(apiModel?.evaluations);
-	const apiIntelligence = asRecord(apiModel?.intelligence);
-	const apiIntelligenceIndexCost = asRecord(apiModel?.intelligence_index_cost);
+	const evaluations = asRecord(artificialAnalysisModel.evaluations);
+	const intelligence = asRecord(artificialAnalysisModel.intelligence);
+	const intelligenceIndexCost = asRecord(
+		artificialAnalysisModel.intelligence_index_cost,
+	);
+	const logo =
+		typeof artificialAnalysisModel.logo === "string"
+			? artificialAnalysisModel.logo
+			: null;
 	const matchedModelsDev = modelsDevById.get(matchedModelId) ?? null;
 	const matchedModelFields = asRecord(matchedModelsDev?.model);
 	const canonicalId = canonicalModelId(
@@ -101,18 +103,9 @@ function buildMatchedRowFromScrapedModel(
 		family: matchedFamily,
 		logo,
 		...matchedModelFieldsWithoutIdFamilyAndModelRefs,
-		evaluations: {
-			...apiEvaluations,
-			...evaluations,
-		},
-		intelligence: {
-			...apiIntelligence,
-			...intelligence,
-		},
-		intelligence_index_cost: {
-			...apiIntelligenceIndexCost,
-			...intelligenceIndexCost,
-		},
+		evaluations,
+		intelligence,
+		intelligence_index_cost: intelligenceIndexCost,
 	};
 }
 
@@ -122,7 +115,7 @@ export async function buildMatchedRows(
 	matcherConfig: MatcherConfig,
 ): Promise<Record<string, unknown>[]> {
 	const fallbackDiagnostics = await getScraperFallbackMatchDiagnostics({
-		scrapedRows: sourceData.scrapedRows,
+		scrapedRows: sourceData.artificialAnalysisRows,
 		modelsDevModels: sourceData.preferredModelsDevModels,
 	});
 
@@ -141,17 +134,14 @@ export async function buildMatchedRows(
 			) {
 				return null;
 			}
-			const scrapedModel = sourceData.scrapedBySlug.get(
+			const artificialAnalysisModel = sourceData.artificialAnalysisBySlug.get(
 				matchedModel.artificial_analysis_slug,
 			);
-			if (!scrapedModel) {
+			if (!artificialAnalysisModel) {
 				return null;
 			}
-			const apiModel =
-				sourceData.apiBySlug.get(matchedModel.artificial_analysis_slug) ?? null;
-			return buildMatchedRowFromScrapedModel(
-				scrapedModel,
-				apiModel,
+			return buildMatchedRowFromArtificialAnalysisModel(
+				artificialAnalysisModel,
 				matchedModelId,
 				sourceData.modelsDevById,
 			);

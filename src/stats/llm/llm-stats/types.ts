@@ -2,18 +2,13 @@
 
 import type { JsonObject } from "../shared";
 /** Shared public and stage-handoff types for the final selected LLM stats pipeline. */
-import type { getArtificialAnalysisStats } from "../sources/artificial-analysis-api";
 import type { getModelsDevStats } from "../sources/models-dev";
-
-export type ArtificialAnalysisModel = Awaited<
-	ReturnType<typeof getArtificialAnalysisStats>
->["models"][number];
 
 export type ModelsDevModel = Awaited<
 	ReturnType<typeof getModelsDevStats>
 >["models"][number];
 
-export type ScrapedEvalModel = {
+export type ArtificialAnalysisModel = {
 	model_id?: unknown;
 	logo?: unknown;
 	evaluations?: unknown;
@@ -102,11 +97,10 @@ export type LlmStatsStageConfig = {
 };
 
 export type SourceData = {
-	scrapedRows: unknown[];
+	artificialAnalysisRows: unknown[];
 	preferredModelsDevModels: ModelsDevModel[];
 	modelsDevById: Map<string, ModelsDevModel>;
-	apiBySlug: Map<string, ArtificialAnalysisModel>;
-	scrapedBySlug: Map<string, ScrapedEvalModel>;
+	artificialAnalysisBySlug: Map<string, ArtificialAnalysisModel>;
 };
 
 export type EnrichedRows = {

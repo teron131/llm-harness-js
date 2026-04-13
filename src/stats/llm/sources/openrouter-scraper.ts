@@ -69,15 +69,12 @@ type OpenRouterPricingSummary = {
 
 export type OpenRouterScrapedModel = {
 	id: string;
-	permaslug: string | null;
 	performance: OpenRouterPerformanceSummary;
 	pricing: OpenRouterPricingSummary;
 };
 
 export type OpenRouterScrapedPayload = {
 	fetched_at_epoch_seconds: number;
-	total_requested_models: number;
-	total_resolved_models: number;
 	models: OpenRouterScrapedModel[];
 };
 
@@ -202,7 +199,6 @@ function summarizePricing(
 function emptyScrapedModel(modelId: string): OpenRouterScrapedModel {
 	return {
 		id: modelId,
-		permaslug: null,
 		performance: summarizePerformance({}),
 		pricing: summarizePricing(null),
 	};
@@ -479,7 +475,6 @@ async function fetchBestAvailableModelStats(
 			const pricing = summarizePricing(stats.pricing);
 			const resolvedModel: OpenRouterScrapedModel = {
 				id: modelId,
-				permaslug,
 				performance,
 				pricing,
 			};
@@ -540,9 +535,6 @@ export async function getOpenRouterScrapedStats(
 
 	return {
 		fetched_at_epoch_seconds: nowEpochSeconds(),
-		total_requested_models: uniqueModelIds.length,
-		total_resolved_models: models.filter((model) => model.permaslug != null)
-			.length,
 		models,
 	};
 }
