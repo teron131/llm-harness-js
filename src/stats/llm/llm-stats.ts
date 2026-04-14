@@ -164,7 +164,7 @@ async function buildModelStatsSelectedPayload(
 		LLM_STATS_STAGE_CONFIG.openrouter,
 		LLM_STATS_STAGE_CONFIG.scoring,
 	);
-	const models = buildFinalModels(
+	const models = await buildFinalModels(
 		enrichedRows,
 		modelId,
 		LLM_STATS_STAGE_CONFIG.final,

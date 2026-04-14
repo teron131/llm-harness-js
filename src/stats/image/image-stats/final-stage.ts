@@ -1,6 +1,7 @@
 /** Final-stage helpers for image stats selection. */
 
 import { resolveStatsLogo } from "../../logo";
+import { cacheStatsLogos } from "../../logo-cache";
 import { asRecord, type JsonObject, meanOrNull } from "../../utils";
 
 import type { ImageStatsSelectedModel, ImageUnionRow } from "./types";
@@ -186,10 +187,10 @@ function filterModelsById(
 }
 /** Build the final Final-stage image stats selection payload. */
 
-export function buildFinalModels(
+export async function buildFinalModels(
 	unionModels: ImageUnionRow[],
 	id?: string | null,
-): ImageStatsSelectedModel[] {
+): Promise<ImageStatsSelectedModel[]> {
 	const selectedModels = unionModels
 		.map(mapUnionModelToSelected)
 		.sort(
@@ -197,5 +198,5 @@ export function buildFinalModels(
 				(right.scores.overall_score ?? Number.NEGATIVE_INFINITY) -
 				(left.scores.overall_score ?? Number.NEGATIVE_INFINITY),
 		);
-	return filterModelsById(selectedModels, id);
+	return cacheStatsLogos(filterModelsById(selectedModels, id));
 }

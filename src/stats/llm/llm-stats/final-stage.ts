@@ -1,6 +1,7 @@
 /** Final-stage helpers for LLM stats selection. */
 
 import { resolveStatsLogo } from "../../logo";
+import { cacheStatsLogos } from "../../logo-cache";
 /** Final projection stage for LLM stats: build the public model shape, attach normalized ranking data, then sort/prune/filter. */
 import { asFiniteNumber, asRecord, type JsonObject } from "../shared";
 
@@ -420,12 +421,12 @@ function projectFinalModel(
 }
 
 /** Build the final selected models list and attach the normalized ranking layer used for ordering. */
-export function buildFinalModels(
+export async function buildFinalModels(
 	enrichedRows: EnrichedRows,
 	id: string | null | undefined,
 	finalConfig: FinalStageConfig,
 	scoringConfig: ScoringConfig,
-): ModelStatsSelectedModel[] {
+): Promise<ModelStatsSelectedModel[]> {
 	const models = enrichedRows.rows.map((row) =>
 		projectFinalModel(
 			row,
@@ -440,5 +441,5 @@ export function buildFinalModels(
 	const sortedModels =
 		sortModelsByIntelligenceRelativeScore(scoreFilteredModels);
 	const prunedModels = pruneSparseFields(sortedModels, finalConfig);
-	return filterModelsById(prunedModels, id);
+	return cacheStatsLogos(filterModelsById(prunedModels, id));
 }

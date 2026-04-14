@@ -45,7 +45,7 @@ export async function getImageStatsSelected(
 
 		const sourceData = await fetchSourceData();
 		const matchedRows = await buildMatchedRows(sourceData);
-		const models = buildFinalModels(matchedRows, options.id);
+		const models = await buildFinalModels(matchedRows, options.id);
 		const fetchedAt = currentEpochSeconds();
 
 		if (options.id != null) {
