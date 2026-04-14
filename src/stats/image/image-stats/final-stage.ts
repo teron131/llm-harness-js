@@ -1,5 +1,6 @@
 /** Final-stage helpers for image stats selection. */
 
+import { resolveStatsLogo } from "../../logo";
 import { asRecord, type JsonObject, meanOrNull } from "../../utils";
 
 import type { ImageStatsSelectedModel, ImageUnionRow } from "./types";
@@ -29,10 +30,10 @@ function buildLogo(model: JsonObject, provider: string | null): string {
 	const artificialAnalysis = asRecord(model.artificial_analysis);
 	const modelCreator = asRecord(artificialAnalysis.model_creator);
 	const logoSlug = modelCreator.slug;
-	if (typeof logoSlug === "string" && logoSlug.length > 0) {
-		return `https://artificialanalysis.ai/img/logos/${logoSlug}_small.svg`;
-	}
-	return `https://models.dev/logos/${(provider ?? "unknown").toLowerCase()}.svg`;
+	return resolveStatsLogo({
+		provider,
+		modelCreatorSlug: typeof logoSlug === "string" ? logoSlug : null,
+	});
 }
 /** Select the relevant score fields for Final-stage image stats selection. */
 

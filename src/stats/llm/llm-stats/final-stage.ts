@@ -1,5 +1,6 @@
 /** Final-stage helpers for LLM stats selection. */
 
+import { resolveStatsLogo } from "../../logo";
 /** Final projection stage for LLM stats: build the public model shape, attach normalized ranking data, then sort/prune/filter. */
 import { asFiniteNumber, asRecord, type JsonObject } from "../shared";
 
@@ -67,14 +68,12 @@ function providerFromModel(model: JsonObject): string | null {
 /** Build the logo field for Final-stage LLM stats selection. */
 
 function buildLogo(model: JsonObject, provider: string | null): string {
-	if (typeof model.logo === "string" && model.logo.length > 0) {
-		return model.logo;
-	}
 	const logoSlug = asRecord(model.model_creator).slug;
-	if (typeof logoSlug === "string" && logoSlug.length > 0) {
-		return `https://artificialanalysis.ai/img/logos/${logoSlug}_small.svg`;
-	}
-	return `https://models.dev/logos/${provider ?? "unknown"}.svg`;
+	return resolveStatsLogo({
+		provider,
+		explicitLogo: typeof model.logo === "string" ? model.logo : null,
+		modelCreatorSlug: typeof logoSlug === "string" ? logoSlug : null,
+	});
 }
 /** Build the speed score for Final-stage LLM stats selection. */
 
