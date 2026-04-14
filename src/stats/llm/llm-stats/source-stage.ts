@@ -4,6 +4,7 @@ import {
 	FALLBACK_PROVIDER_IDS,
 	modelSlugFromModelId,
 	PRIMARY_PROVIDER_ID,
+	providerPreferenceRank,
 } from "../shared";
 import { getArtificialAnalysisScrapedEvalsOnlyStats } from "../sources/artificial-analysis-scraper";
 import { getModelsDevStats } from "../sources/models-dev";
@@ -18,15 +19,18 @@ import type {
 function dedupePreferredProviderModels(
 	modelsDevModels: ModelsDevModel[],
 ): ModelsDevModel[] {
-	const preferredModels = modelsDevModels.filter(
-		(modelsDevModel) =>
+	const preferredModels = modelsDevModels.filter((modelsDevModel) => {
+		return (
 			modelsDevModel.provider_id === PRIMARY_PROVIDER_ID ||
-			FALLBACK_PROVIDER_IDS.has(modelsDevModel.provider_id),
-	);
+			FALLBACK_PROVIDER_IDS.has(modelsDevModel.provider_id)
+		);
+	});
 	const byModelId = new Map<string, ModelsDevModel>();
 	const withPriority = preferredModels.map((modelsDevModel) => ({
 		modelsDevModel,
-		priority: modelsDevModel.provider_id === PRIMARY_PROVIDER_ID ? 0 : 1,
+		priority:
+			providerPreferenceRank(modelsDevModel.provider_id) ??
+			Number.POSITIVE_INFINITY,
 	}));
 	withPriority.sort((left, right) => left.priority - right.priority);
 	for (const { modelsDevModel } of withPriority) {

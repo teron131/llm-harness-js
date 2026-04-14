@@ -3,10 +3,13 @@
 import { fetchWithTimeout, nowEpochSeconds } from "../../utils";
 
 const MODELS_DEV_URL = "https://models.dev/api.json";
+const VERCEL_AI_GATEWAY_MODELS_URL = "https://vercel.com/ai-gateway/models";
 const LOOKBACK_DAYS = 365;
 const REQUEST_TIMEOUT_MS = 30_000;
-
-type NumberOrNull = number | null;
+const VERCEL_PROVIDER_ID = "vercel";
+const VERCEL_PROVIDER_NAME = "Vercel AI Gateway";
+const VERCEL_GATEWAY_MODEL_PATTERN =
+	/\\"displayName\\":\\"([^\\"]*)\\",\\"creatorOrganization\\":\\"[^\\"]*\\",\\"copyString\\":\\"([^\\"]+)\\",[\s\S]*?\\"releaseDate\\":\\"([^\\"]*)\\"/g;
 
 type ModelRecord = {
 	id?: string;
@@ -58,6 +61,12 @@ type ModelsDevSourcePayload = {
 	payload: ModelsDevPayload;
 };
 
+type VercelGatewayModelRecord = {
+	display_name: string;
+	model_id: string;
+	release_date: string | null;
+};
+
 /**
  * Normalized models.dev response after flattening and ranking.
  *
@@ -96,24 +105,113 @@ function isRecentDate(
 }
 /** Convert the input into a finite number for Models.dev source recent model stats. */
 
-function asFiniteNumber(value: unknown): NumberOrNull {
+function asFiniteNumber(value: unknown): number | null {
 	const numeric = Number(value);
 	return Number.isFinite(numeric) ? numeric : null;
+}
+/** Return whether the current value is a sentinel string from upstream page markup. */
+
+function isSentinelString(value: string | null | undefined): boolean {
+	return !value || value === "$undefined";
+}
+/** Build one Vercel-backed model record, preferring the live page name and keeping models.dev metadata. */
+
+function buildVercelModelRecord(
+	model: VercelGatewayModelRecord,
+	fallbackModel: ModelRecord | undefined,
+): ModelRecord {
+	return {
+		...fallbackModel,
+		id: model.model_id,
+		name: model.display_name || fallbackModel?.name || model.model_id,
+		release_date: model.release_date ?? fallbackModel?.release_date,
+		last_updated: model.release_date ?? fallbackModel?.last_updated,
+	};
+}
+/** Extract live Vercel AI Gateway models from the public catalog page. */
+
+function extractVercelGatewayModels(html: string): VercelGatewayModelRecord[] {
+	const matches = [...html.matchAll(VERCEL_GATEWAY_MODEL_PATTERN)];
+	const byModelId = new Map<string, VercelGatewayModelRecord>();
+
+	for (const match of matches) {
+		const [, displayName, modelId, releaseDate] = match;
+		if (!modelId) {
+			continue;
+		}
+		byModelId.set(modelId, {
+			display_name: displayName ?? modelId,
+			model_id: modelId,
+			release_date: isSentinelString(releaseDate)
+				? null
+				: (releaseDate ?? null),
+		});
+	}
+
+	return [...byModelId.values()];
+}
+/** Fetch the Vercel AI Gateway models page and normalize it into models.dev-compatible rows. */
+
+async function fetchVercelGatewayModels(): Promise<VercelGatewayModelRecord[]> {
+	try {
+		const response = await fetchWithTimeout(
+			VERCEL_AI_GATEWAY_MODELS_URL,
+			{},
+			REQUEST_TIMEOUT_MS,
+		);
+		if (!response.ok) {
+			throw new Error(`Vercel AI Gateway request failed: ${response.status}`);
+		}
+		return extractVercelGatewayModels(await response.text());
+	} catch {
+		return [];
+	}
+}
+/** Merge the live Vercel model list into the models.dev provider catalog. */
+
+function mergeVercelProvider(
+	payload: ModelsDevPayload,
+	liveVercelModels: VercelGatewayModelRecord[],
+): ModelsDevPayload {
+	const existingVercelProvider = payload[VERCEL_PROVIDER_ID];
+	const existingVercelModels = existingVercelProvider?.models ?? {};
+	if (liveVercelModels.length === 0) {
+		return payload;
+	}
+
+	const mergedVercelModels = Object.fromEntries(
+		liveVercelModels.map((model) => [
+			model.model_id,
+			buildVercelModelRecord(model, existingVercelModels[model.model_id]),
+		]),
+	);
+
+	return {
+		...payload,
+		[VERCEL_PROVIDER_ID]: {
+			...existingVercelProvider,
+			id: VERCEL_PROVIDER_ID,
+			name: existingVercelProvider?.name ?? VERCEL_PROVIDER_NAME,
+			models: mergedVercelModels,
+		},
+	};
 }
 /** Fetch and cache Models.dev source recent model stats data. */
 
 async function fetchModelsDev(): Promise<ModelsDevSourcePayload> {
-	const response = await fetchWithTimeout(
-		MODELS_DEV_URL,
-		{},
-		REQUEST_TIMEOUT_MS,
-	);
+	const [response, liveVercelModels] = await Promise.all([
+		fetchWithTimeout(MODELS_DEV_URL, {}, REQUEST_TIMEOUT_MS),
+		fetchVercelGatewayModels(),
+	]);
 
 	if (!response.ok) {
 		throw new Error(`models.dev request failed: ${response.status}`);
 	}
 
-	const payload = (await response.json()) as ModelsDevPayload;
+	const payload = mergeVercelProvider(
+		(await response.json()) as ModelsDevPayload,
+		liveVercelModels,
+	);
 	const sourcePayload: ModelsDevSourcePayload = {
 		fetched_at_epoch_seconds: nowEpochSeconds(),
 		status_code: response.status,

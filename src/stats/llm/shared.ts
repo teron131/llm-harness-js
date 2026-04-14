@@ -5,7 +5,30 @@ import { asFiniteNumber, asRecord, type JsonObject } from "../utils";
 export { asFiniteNumber, asRecord, type JsonObject };
 
 export const PRIMARY_PROVIDER_ID = "openrouter" as const;
-export const FALLBACK_PROVIDER_IDS = new Set(["openai", "google", "anthropic"]);
+export const SECONDARY_PROVIDER_ID = "vercel" as const;
+export const TERTIARY_PROVIDER_IDS = ["openai", "google", "anthropic"] as const;
+export const FALLBACK_PROVIDER_IDS: ReadonlySet<string> = new Set([
+	SECONDARY_PROVIDER_ID,
+	...TERTIARY_PROVIDER_IDS,
+]);
+/** Return the provider preference rank used by the stats matcher and source stage. */
+
+export function providerPreferenceRank(providerId: string): number | null {
+	if (providerId === PRIMARY_PROVIDER_ID) {
+		return 0;
+	}
+	if (providerId === SECONDARY_PROVIDER_ID) {
+		return 1;
+	}
+	if (
+		TERTIARY_PROVIDER_IDS.includes(
+			providerId as (typeof TERTIARY_PROVIDER_IDS)[number],
+		)
+	) {
+		return 2;
+	}
+	return null;
+}
 /** Normalize a model token for matching. */
 
 export function normalizeModelToken(value: string): string {
