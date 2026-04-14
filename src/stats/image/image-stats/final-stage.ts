@@ -25,6 +25,26 @@ function providerFromArenaProvider(value: unknown): string | null {
 	const left = value.split("·")[0]?.trim();
 	return left && left.length > 0 ? left : null;
 }
+
+function recordOrNull(record: JsonObject): JsonObject | null {
+	return Object.keys(record).length > 0 ? record : null;
+}
+
+function preferredString(...values: unknown[]): string | null {
+	for (const value of values) {
+		if (typeof value === "string" && value.length > 0) {
+			return value;
+		}
+	}
+	return null;
+}
+
+function providerFromArtificialAnalysis(
+	artificialAnalysis: JsonObject,
+): string | null {
+	const modelCreator = asRecord(artificialAnalysis.model_creator);
+	return typeof modelCreator.name === "string" ? modelCreator.name : null;
+}
 /** Build the logo field for Final-stage image stats selection. */
 
 function buildLogo(model: JsonObject, provider: string | null): string {
@@ -45,28 +65,26 @@ function buildLogo(model: JsonObject, provider: string | null): string {
 function pickArtificialAnalysisPercentiles(
 	model: JsonObject,
 ): JsonObject | null {
-	const percentiles = asRecord(asRecord(model.artificial_analysis).percentiles);
-	return Object.keys(percentiles).length > 0 ? percentiles : null;
+	return recordOrNull(
+		asRecord(asRecord(model.artificial_analysis).percentiles),
+	);
 }
 /** Select the relevant score fields for Final-stage image stats selection. */
 
 function pickArenaPercentiles(model: JsonObject): JsonObject | null {
-	const percentiles = asRecord(asRecord(model.arena_ai).percentiles);
-	return Object.keys(percentiles).length > 0 ? percentiles : null;
+	return recordOrNull(asRecord(asRecord(model.arena_ai).percentiles));
 }
 /** Select the relevant score fields for Final-stage image stats selection. */
 
 function pickArtificialAnalysisScores(model: JsonObject): JsonObject | null {
-	const weightedScores = asRecord(
-		asRecord(model.artificial_analysis).weighted_scores,
+	return recordOrNull(
+		asRecord(asRecord(model.artificial_analysis).weighted_scores),
 	);
-	return Object.keys(weightedScores).length > 0 ? weightedScores : null;
 }
 /** Select the relevant score fields for Final-stage image stats selection. */
 
 function pickArenaScores(model: JsonObject): JsonObject | null {
-	const weightedScores = asRecord(asRecord(model.arena_ai).weighted_scores);
-	return Object.keys(weightedScores).length > 0 ? weightedScores : null;
+	return recordOrNull(asRecord(asRecord(model.arena_ai).weighted_scores));
 }
 /** Map a source model into the selected Final-stage image stats selection payload. */
 
@@ -82,20 +100,16 @@ function mapUnionModelToSelected(
 		pickArtificialAnalysisPercentiles(model);
 	const arenaPercentiles = pickArenaPercentiles(model);
 	const bestMatch = asRecord(model.best_match);
-	const inferredId = toModelId(
-		(typeof artificialAnalysis.slug === "string" && artificialAnalysis.slug) ||
-			(typeof artificialAnalysis.name === "string" &&
-				artificialAnalysis.name) ||
-			(typeof arena.model === "string" && arena.model) ||
-			(typeof bestMatch.arena_model === "string" && bestMatch.arena_model) ||
-			"unknown",
+	const modelName = preferredString(
+		artificialAnalysis.name,
+		artificialAnalysis.slug,
+		arena.model,
+		bestMatch.arena_model,
 	);
+	const inferredId = toModelId(modelName ?? "unknown");
 	const provider =
-		(typeof artificialAnalysis.model_creator === "object" &&
-		artificialAnalysis.model_creator != null &&
-		typeof asRecord(artificialAnalysis.model_creator).name === "string"
-			? (asRecord(artificialAnalysis.model_creator).name as string)
-			: null) ?? providerFromArenaProvider(arena.provider);
+		providerFromArtificialAnalysis(artificialAnalysis) ??
+		providerFromArenaProvider(arena.provider);
 
 	const photorealisticScore = meanOrNull([
 		artificialAnalysisScores?.photorealistic,
@@ -134,14 +148,7 @@ function mapUnionModelToSelected(
 
 	return {
 		id: inferredId.length > 0 ? inferredId : null,
-		name:
-			(typeof artificialAnalysis.name === "string" &&
-				artificialAnalysis.name) ||
-			(typeof artificialAnalysis.slug === "string" &&
-				artificialAnalysis.slug) ||
-			(typeof arena.model === "string" && arena.model) ||
-			(typeof bestMatch.arena_model === "string" && bestMatch.arena_model) ||
-			null,
+		name: modelName,
 		provider: provider ?? null,
 		logo: buildLogo(model, provider),
 		release_date:
@@ -180,10 +187,7 @@ function filterModelsById(
 	models: ImageStatsSelectedModel[],
 	id: string | null | undefined,
 ): ImageStatsSelectedModel[] {
-	if (id == null) {
-		return models;
-	}
-	return models.filter((model) => model.id === id);
+	return id == null ? models : models.filter((model) => model.id === id);
 }
 /** Build the final Final-stage image stats selection payload. */
 

@@ -48,11 +48,20 @@ const ARTIFICIAL_ANALYSIS_LOGO_ASSET_BY_PROVIDER: Record<string, string> = {
 	"z-ai": "zai_small.svg",
 };
 
-function normalizeProvider(provider: string | null | undefined): string | null {
-	if (typeof provider !== "string") {
+function nonEmptyString(value: string | null | undefined): string | null {
+	if (typeof value !== "string") {
 		return null;
 	}
-	const normalizedProvider = provider
+	const normalizedValue = value.trim();
+	return normalizedValue.length > 0 ? normalizedValue : null;
+}
+
+function normalizeProvider(provider: string | null | undefined): string | null {
+	const providerValue = nonEmptyString(provider);
+	if (!providerValue) {
+		return null;
+	}
+	const normalizedProvider = providerValue
 		.trim()
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
@@ -63,28 +72,37 @@ function normalizeProvider(provider: string | null | undefined): string | null {
 function toAbsoluteArtificialAnalysisLogoUrl(
 	logoUrl: string | null | undefined,
 ): string | null {
-	if (typeof logoUrl !== "string" || logoUrl.length === 0) {
+	const logoValue = nonEmptyString(logoUrl);
+	if (!logoValue) {
 		return null;
 	}
-	if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
-		return logoUrl;
+	if (logoValue.startsWith("http://") || logoValue.startsWith("https://")) {
+		return logoValue;
 	}
-	if (logoUrl.startsWith("/")) {
-		return `https://artificialanalysis.ai${logoUrl}`;
+	if (logoValue.startsWith("/")) {
+		return `https://artificialanalysis.ai${logoValue}`;
 	}
-	if (logoUrl.includes("/")) {
-		return `https://artificialanalysis.ai/${logoUrl}`;
+	if (logoValue.includes("/")) {
+		return `https://artificialanalysis.ai/${logoValue}`;
 	}
-	return `${ARTIFICIAL_ANALYSIS_LOGO_URL}/${logoUrl}`;
+	return `${ARTIFICIAL_ANALYSIS_LOGO_URL}/${logoValue}`;
 }
 
 function buildArtificialAnalysisLogoUrl(
 	asset: string | null | undefined,
 ): string | null {
-	if (typeof asset !== "string" || asset.length === 0) {
+	const assetValue = nonEmptyString(asset);
+	if (!assetValue) {
 		return null;
 	}
-	return `${ARTIFICIAL_ANALYSIS_LOGO_URL}/${asset}`;
+	return `${ARTIFICIAL_ANALYSIS_LOGO_URL}/${assetValue}`;
+}
+
+function artificialAnalysisLogoAsset(provider: string | null): string | null {
+	if (!provider) {
+		return null;
+	}
+	return ARTIFICIAL_ANALYSIS_LOGO_ASSET_BY_PROVIDER[provider] ?? null;
 }
 
 export function resolveStatsLogo(options: {
@@ -94,9 +112,7 @@ export function resolveStatsLogo(options: {
 	const provider = normalizeProvider(options.provider);
 	return (
 		toAbsoluteArtificialAnalysisLogoUrl(options.explicitLogo) ??
-		buildArtificialAnalysisLogoUrl(
-			provider ? ARTIFICIAL_ANALYSIS_LOGO_ASSET_BY_PROVIDER[provider] : null,
-		) ??
+		buildArtificialAnalysisLogoUrl(artificialAnalysisLogoAsset(provider)) ??
 		""
 	);
 }

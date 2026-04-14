@@ -45,6 +45,14 @@ const STABLE_TOP_LEVEL_KEYS = new Set<string>([
 	"scores",
 	"relative_scores",
 ]);
+
+function recordOrNull(record: JsonObject): JsonObject | null {
+	return Object.keys(record).length > 0 ? record : null;
+}
+
+function modelSortKey(model: ModelStatsSelectedModel): string {
+	return model.id ?? "";
+}
 /** Resolve the provider for Final-stage LLM stats selection. */
 
 function providerFromId(modelId: unknown): string | null {
@@ -121,13 +129,12 @@ function buildCost(
 	if (blendedPrice != null) {
 		cleanedCost.blended_price = blendedPrice;
 	}
-	return Object.keys(cleanedCost).length > 0 ? cleanedCost : null;
+	return recordOrNull(cleanedCost);
 }
 /** Build evaluation fields for Final-stage LLM stats selection. */
 
 function buildEvaluations(model: JsonObject): unknown {
-	const evaluations = asRecord(model.evaluations);
-	return Object.keys(evaluations).length > 0 ? evaluations : null;
+	return recordOrNull(asRecord(model.evaluations));
 }
 /** Build the intelligence score for Final-stage LLM stats selection. */
 
@@ -142,7 +149,7 @@ function buildIntelligence(model: JsonObject): unknown {
 	}
 	delete intelligence[INTELLIGENCE_COST_TOTAL_COST_KEY];
 	delete intelligence[INTELLIGENCE_COST_TOTAL_TOKENS_KEY];
-	return Object.keys(intelligence).length > 0 ? intelligence : null;
+	return recordOrNull(intelligence);
 }
 /** Build the intelligence index cost for Final-stage LLM stats selection. */
 
@@ -167,7 +174,7 @@ function buildIntelligenceIndexCost(model: JsonObject): unknown {
 	const cleaned = Object.fromEntries(
 		Object.entries(normalized).filter(([, value]) => value != null),
 	);
-	return Object.keys(cleaned).length > 0 ? cleaned : null;
+	return recordOrNull(cleaned as JsonObject);
 }
 /** Helper for intelligence relative score value. */
 
@@ -185,7 +192,7 @@ function sortModelsByIntelligenceRelativeScore(
 		const leftIntelligence = intelligenceRelativeScoreValue(left);
 		const rightIntelligence = intelligenceRelativeScoreValue(right);
 		if (leftIntelligence == null && rightIntelligence == null) {
-			return (left.id ?? "").localeCompare(right.id ?? "");
+			return modelSortKey(left).localeCompare(modelSortKey(right));
 		}
 		if (leftIntelligence == null) {
 			return 1;
@@ -196,7 +203,7 @@ function sortModelsByIntelligenceRelativeScore(
 		if (leftIntelligence !== rightIntelligence) {
 			return rightIntelligence - leftIntelligence;
 		}
-		return (left.id ?? "").localeCompare(right.id ?? "");
+		return modelSortKey(left).localeCompare(modelSortKey(right));
 	});
 }
 /** Return whether the model has the minimum score signal needed for the public list. */
@@ -369,10 +376,7 @@ function filterModelsById(
 	models: ModelStatsSelectedModel[],
 	id: string | null | undefined,
 ): ModelStatsSelectedModel[] {
-	if (id == null) {
-		return models;
-	}
-	return models.filter((model) => model.id === id);
+	return id == null ? models : models.filter((model) => model.id === id);
 }
 
 /** Build the final public model row from one enriched intermediate row. */

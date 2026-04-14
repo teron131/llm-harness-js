@@ -21,6 +21,10 @@ export type {
 	ImageStatsSelectedOptions,
 	ImageStatsSelectedPayload,
 };
+
+function isListRequest(modelId: string | null | undefined): boolean {
+	return modelId == null;
+}
 /** Save the selected Stats pipeline payload. */
 
 export async function saveImageStatsSelected(
@@ -35,7 +39,9 @@ export async function getImageStatsSelected(
 	options: ImageStatsSelectedOptions = {},
 ): Promise<ImageStatsSelectedPayload> {
 	try {
-		if (options.id == null) {
+		const modelId = options.id ?? null;
+
+		if (isListRequest(modelId)) {
 			const cachedPayload =
 				await loadImageStatsSelectedFromCache(DEFAULT_OUTPUT_PATH);
 			if (cachedPayload) {
@@ -45,10 +51,10 @@ export async function getImageStatsSelected(
 
 		const sourceData = await fetchSourceData();
 		const matchedRows = await buildMatchedRows(sourceData);
-		const models = await buildFinalModels(matchedRows, options.id);
+		const models = await buildFinalModels(matchedRows, modelId);
 		const fetchedAt = currentEpochSeconds();
 
-		if (options.id != null) {
+		if (!isListRequest(modelId)) {
 			return {
 				fetched_at_epoch_seconds: fetchedAt,
 				models,

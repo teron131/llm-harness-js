@@ -12,7 +12,7 @@ const LOGO_CACHE_DIR = resolve(".cache/stats-logos");
 const LOGO_CACHE_SIZE = 128;
 const LOGO_FETCH_TIMEOUT_MS = 15_000;
 
-const pendingLogoBySource = new Map<string, Promise<string>>();
+const pendingCacheRequestBySource = new Map<string, Promise<string>>();
 
 function isRemoteLogoSource(source: string): boolean {
 	return /^https?:\/\//i.test(source);
@@ -37,6 +37,14 @@ async function loadCachedLogoDataUrl(
 	} catch {
 		return null;
 	}
+}
+
+async function saveCachedLogoBuffer(
+	cachePath: string,
+	imageBuffer: Buffer,
+): Promise<void> {
+	await mkdir(LOGO_CACHE_DIR, { recursive: true });
+	await writeFile(cachePath, imageBuffer);
 }
 
 async function resizeLogoToPng(imageBuffer: Buffer): Promise<Buffer> {
@@ -75,9 +83,16 @@ async function buildCachedLogoDataUrl(source: string): Promise<string> {
 
 	const imageBuffer = Buffer.from(await response.arrayBuffer());
 	const resizedLogoBuffer = await resizeLogoToPng(imageBuffer);
-	await mkdir(LOGO_CACHE_DIR, { recursive: true });
-	await writeFile(cachePath, resizedLogoBuffer);
+	await saveCachedLogoBuffer(cachePath, resizedLogoBuffer);
 	return pngDataUrl(resizedLogoBuffer);
+}
+
+function uniqueLogoSources<TModel extends { logo: string }>(
+	models: TModel[],
+): string[] {
+	return [...new Set(models.map((model) => model.logo))].filter(
+		(source) => source.length > 0,
+	);
 }
 
 export async function cacheStatsLogo(source: string): Promise<string> {
@@ -85,7 +100,7 @@ export async function cacheStatsLogo(source: string): Promise<string> {
 		return source;
 	}
 
-	const existingRequest = pendingLogoBySource.get(source);
+	const existingRequest = pendingCacheRequestBySource.get(source);
 	if (existingRequest) {
 		return existingRequest;
 	}
@@ -93,9 +108,9 @@ export async function cacheStatsLogo(source: string): Promise<string> {
 	const request = buildCachedLogoDataUrl(source)
 		.catch(() => source)
 		.finally(() => {
-			pendingLogoBySource.delete(source);
+			pendingCacheRequestBySource.delete(source);
 		});
-	pendingLogoBySource.set(source, request);
+	pendingCacheRequestBySource.set(source, request);
 	return request;
 }
 
@@ -105,9 +120,7 @@ export async function cacheStatsLogos<
 	},
 >(models: TModel[]): Promise<TModel[]> {
 	const cachedLogoBySource = new Map<string, string>();
-	const uniqueSources = [...new Set(models.map((model) => model.logo))].filter(
-		(source) => source.length > 0,
-	);
+	const uniqueSources = uniqueLogoSources(models);
 
 	await Promise.all(
 		uniqueSources.map(async (source) => {

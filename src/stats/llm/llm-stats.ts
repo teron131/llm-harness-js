@@ -68,6 +68,10 @@ const LLM_STATS_STAGE_CONFIG = {
 	},
 } satisfies LlmStatsStageConfig;
 
+function isListRequest(modelId: string | null | undefined): boolean {
+	return modelId == null;
+}
+
 function sortedUniqueKeys(values: Iterable<string>): string[] {
 	return [...new Set(values)].sort((left, right) => left.localeCompare(right));
 }
@@ -187,7 +191,11 @@ async function getModelStatsSelectedPayload(
 	saveCache: boolean,
 ): Promise<ModelStatsSelectedPayload> {
 	try {
-		if (useCache && options.id == null) {
+		const modelId = options.id ?? null;
+		const shouldUseListCache = useCache && isListRequest(modelId);
+		const shouldSaveListCache = saveCache && isListRequest(modelId);
+
+		if (shouldUseListCache) {
 			const cachedPayload =
 				await loadModelStatsSelectedFromCache(DEFAULT_OUTPUT_PATH);
 			if (cachedPayload) {
@@ -195,8 +203,8 @@ async function getModelStatsSelectedPayload(
 			}
 		}
 
-		const payload = await buildModelStatsSelectedPayload(options.id ?? null);
-		if (saveCache && options.id == null) {
+		const payload = await buildModelStatsSelectedPayload(modelId);
+		if (shouldSaveListCache) {
 			await saveModelStatsSelected(payload, DEFAULT_OUTPUT_PATH);
 		}
 		return payload;
