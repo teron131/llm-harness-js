@@ -68,11 +68,9 @@ function providerFromModel(model: JsonObject): string | null {
 /** Build the logo field for Final-stage LLM stats selection. */
 
 function buildLogo(model: JsonObject, provider: string | null): string {
-	const logoSlug = asRecord(model.model_creator).slug;
 	return resolveStatsLogo({
 		provider,
 		explicitLogo: typeof model.logo === "string" ? model.logo : null,
-		modelCreatorSlug: typeof logoSlug === "string" ? logoSlug : null,
 	});
 }
 /** Build the speed score for Final-stage LLM stats selection. */

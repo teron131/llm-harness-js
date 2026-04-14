@@ -29,15 +29,21 @@ function providerFromArenaProvider(value: unknown): string | null {
 function buildLogo(model: JsonObject, provider: string | null): string {
 	const artificialAnalysis = asRecord(model.artificial_analysis);
 	const modelCreator = asRecord(artificialAnalysis.model_creator);
-	const logoSlug = modelCreator.slug;
 	return resolveStatsLogo({
 		provider,
-		modelCreatorSlug: typeof logoSlug === "string" ? logoSlug : null,
+		explicitLogo:
+			typeof modelCreator.logo === "string"
+				? modelCreator.logo
+				: typeof artificialAnalysis.logo === "string"
+					? artificialAnalysis.logo
+					: null,
 	});
 }
 /** Select the relevant score fields for Final-stage image stats selection. */
 
-function pickAaPercentiles(model: JsonObject): JsonObject | null {
+function pickArtificialAnalysisPercentiles(
+	model: JsonObject,
+): JsonObject | null {
 	const percentiles = asRecord(asRecord(model.artificial_analysis).percentiles);
 	return Object.keys(percentiles).length > 0 ? percentiles : null;
 }
@@ -49,7 +55,7 @@ function pickArenaPercentiles(model: JsonObject): JsonObject | null {
 }
 /** Select the relevant score fields for Final-stage image stats selection. */
 
-function pickAaScores(model: JsonObject): JsonObject | null {
+function pickArtificialAnalysisScores(model: JsonObject): JsonObject | null {
 	const weightedScores = asRecord(
 		asRecord(model.artificial_analysis).weighted_scores,
 	);
@@ -69,9 +75,10 @@ function mapUnionModelToSelected(
 	const model = unionModel as unknown as JsonObject;
 	const artificialAnalysis = asRecord(model.artificial_analysis);
 	const arena = asRecord(model.arena_ai);
-	const artificialAnalysisScores = pickAaScores(model);
+	const artificialAnalysisScores = pickArtificialAnalysisScores(model);
 	const arenaScores = pickArenaScores(model);
-	const artificialAnalysisPercentiles = pickAaPercentiles(model);
+	const artificialAnalysisPercentiles =
+		pickArtificialAnalysisPercentiles(model);
 	const arenaPercentiles = pickArenaPercentiles(model);
 	const bestMatch = asRecord(model.best_match);
 	const inferredId = toModelId(
