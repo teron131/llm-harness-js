@@ -1,6 +1,26 @@
 # llm-harness-js
 
-Standalone TypeScript port of `llm_harness`, split into its own repo.
+TypeScript companion repo for `llm-harness`, shaped by accumulated work across multiple projects rather than a generic harness.
+
+## Structure
+
+```text
+src/
+├── index.ts   public exports
+├── agents/    workflow orchestration
+│   ├── fixer/
+│   └── youtube/
+├── clients/   runtime adapters
+│   └── parsers/
+├── stats/     LLM and image stats
+│   ├── llm/
+│   └── image/
+├── tools/     integration boundaries
+│   ├── fs/
+│   ├── web/
+│   └── youtube/
+└── utils/     shared helpers
+```
 
 ## Install
 
