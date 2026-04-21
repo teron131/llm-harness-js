@@ -3,7 +3,7 @@
 import type { ClientTool, ServerTool } from "@langchain/core/tools";
 import Exa from "exa-js";
 import { createAgent } from "langchain";
-import type { ZodTypeAny, z } from "zod";
+import type { z, ZodType } from "zod";
 
 import { MediaMessage } from "../clients/multimodal.js";
 import { ChatOpenAI } from "../clients/openai.js";
@@ -31,16 +31,16 @@ type ExaAnswerClient = {
 	): Promise<{ answer: unknown }>;
 };
 type ExaConstructor = new (apiKey?: string) => ExaAnswerClient;
-type AgentResponse<T extends ZodTypeAny | null> = {
+type AgentResponse<T extends ZodType | null> = {
 	messages: unknown[];
-	structuredResponse?: T extends ZodTypeAny ? z.output<T> : never;
+	structuredResponse?: T extends ZodType ? z.output<T> : never;
 };
-type AgentOutput<T extends ZodTypeAny | null> = T extends ZodTypeAny
+type AgentOutput<T extends ZodType | null> = T extends ZodType
 	? z.output<T>
 	: string;
 /** Exa Agent for Agent model orchestration. */
 
-export class ExaAgent<T extends ZodTypeAny> {
+export class ExaAgent<T extends ZodType> {
 	private readonly exa: ExaAnswerClient;
 	private readonly systemPrompt: string;
 	private readonly outputSchema: T;
@@ -64,7 +64,7 @@ export class ExaAgent<T extends ZodTypeAny> {
 }
 /** Base Harness Agent for Agent model orchestration. */
 
-export class BaseHarnessAgent<T extends ZodTypeAny | null = null> {
+export class BaseHarnessAgent<T extends ZodType | null = null> {
 	protected readonly agent: ReturnType<typeof createAgent>;
 	protected readonly model: AgentModel;
 	protected readonly responseFormat: T | undefined;
@@ -153,7 +153,7 @@ export class BaseHarnessAgent<T extends ZodTypeAny | null = null> {
 /** Web Loader Agent for Agent model orchestration. */
 
 export class WebLoaderAgent<
-	T extends ZodTypeAny | null = null,
+	T extends ZodType | null = null,
 > extends BaseHarnessAgent<T> {
 	constructor(args: Record<string, unknown> = {}) {
 		super({
@@ -172,7 +172,7 @@ export class WebLoaderAgent<
 /** Image Analysis Agent for Agent model orchestration. */
 
 export class ImageAnalysisAgent<
-	T extends ZodTypeAny | null = null,
+	T extends ZodType | null = null,
 > extends BaseHarnessAgent<T> {
 	async invoke(
 		imagePaths: string | string[],

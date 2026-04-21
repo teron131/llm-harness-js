@@ -169,7 +169,7 @@ async function runEdScript(filePath: string, script: string): Promise<void> {
 	});
 }
 
-function createFsTool<Schema extends z.ZodTypeAny, Output>(
+function createFsTool<Schema extends z.ZodType, Output>(
 	name: string,
 	description: string,
 	schema: Schema,
