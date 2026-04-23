@@ -20,25 +20,25 @@ import {
 const PATH_TRAVERSAL_ERROR = "Path traversal not allowed";
 const PATH_OUTSIDE_ROOT_ERROR = "Path outside root";
 
-const READ_TEXT_SCHEMA = z.object({
+const ReadTextSchema = z.object({
 	path: z.string(),
 });
 
-const WRITE_TEXT_SCHEMA = z.object({
+const WriteTextSchema = z.object({
 	path: z.string(),
 	text: z.string(),
 });
 
-const PATCH_SCHEMA = z.object({
+const PatchSchema = z.object({
 	patch: z.string(),
 });
 
-const HASHLINE_EDIT_SCHEMA = z.object({
+const HashlineEditRequestSchema = z.object({
 	path: z.string(),
 	edits: z.array(HashlineEditSchema),
 });
 
-const EDIT_WITH_ED_SCHEMA = z.object({
+const EditWithEdSchema = z.object({
 	path: z.string(),
 	script: z.string(),
 });
@@ -188,14 +188,14 @@ export function makeFsTools({ rootDir }: { rootDir: string }) {
 	const fsReadText = createFsTool(
 		"fs_read_text",
 		"Read a UTF-8 text file from the sandboxed workspace.",
-		READ_TEXT_SCHEMA,
+		ReadTextSchema,
 		({ path }) => sandboxFs.readText(path),
 	);
 
 	const fsWriteText = createFsTool(
 		"fs_write_text",
 		"Write a UTF-8 text file into the sandboxed workspace.",
-		WRITE_TEXT_SCHEMA,
+		WriteTextSchema,
 		async ({ path, text }): Promise<string> => {
 			await sandboxFs.writeText(path, text);
 			return `Wrote ${path}`;
@@ -205,28 +205,28 @@ export function makeFsTools({ rootDir }: { rootDir: string }) {
 	const fsPatch = createFsTool(
 		"fs_patch",
 		"Apply a single-file patch to an existing UTF-8 text file.",
-		PATCH_SCHEMA,
+		PatchSchema,
 		({ patch }) => sandboxFs.applyPatch(patch),
 	);
 
 	const fsReadHashline = createFsTool(
 		"fs_read_hashline",
 		"Read a UTF-8 text file rendered as `LINE#HASH:content` entries.",
-		READ_TEXT_SCHEMA,
+		ReadTextSchema,
 		({ path }) => sandboxFs.readHashline(path),
 	);
 
 	const fsEditHashline = createFsTool(
 		"fs_edit_hashline",
 		"Apply hashline edits to an existing UTF-8 text file.",
-		HASHLINE_EDIT_SCHEMA,
+		HashlineEditRequestSchema,
 		({ path, edits }) => sandboxFs.editHashline(path, edits),
 	);
 
 	const fsEditWithEd = createFsTool(
 		"fs_edit_with_ed",
 		"Edit a file by running an `ed` script against it.",
-		EDIT_WITH_ED_SCHEMA,
+		EditWithEdSchema,
 		async ({ path, script }): Promise<string> => {
 			const filePath = await sandboxFs.requireFile(path);
 			await runEdScript(filePath, script);
