@@ -1,7 +1,6 @@
 /** Agent helpers for model orchestration. */
 
 import type { ClientTool, ServerTool } from "@langchain/core/tools";
-import Exa from "exa-js";
 import { createAgent } from "langchain";
 import type { z, ZodType } from "zod";
 
@@ -20,17 +19,6 @@ type GenericTool = ClientTool | ServerTool;
 type AgentModel = ReturnType<typeof ChatOpenAI>;
 type AgentInstance = ReturnType<typeof createAgent>;
 type AgentInvokeInput = Parameters<AgentInstance["invoke"]>[0];
-type ExaAnswerClient = {
-	answer(
-		query: string,
-		options: {
-			systemPrompt: string;
-			text: true;
-			outputSchema: unknown;
-		},
-	): Promise<{ answer: unknown }>;
-};
-type ExaConstructor = new (apiKey?: string) => ExaAnswerClient;
 type AgentResponse<T extends ZodType | null> = {
 	messages: unknown[];
 	structuredResponse?: T extends ZodType ? z.output<T> : never;
@@ -38,30 +26,6 @@ type AgentResponse<T extends ZodType | null> = {
 type AgentOutput<T extends ZodType | null> = T extends ZodType
 	? z.output<T>
 	: string;
-/** Exa Agent for Agent model orchestration. */
-
-export class ExaAgent<T extends ZodType> {
-	private readonly exa: ExaAnswerClient;
-	private readonly systemPrompt: string;
-	private readonly outputSchema: T;
-
-	constructor(systemPrompt: string, outputSchema: T) {
-		this.systemPrompt = systemPrompt;
-		this.outputSchema = outputSchema;
-		const ExaClient = Exa as unknown as ExaConstructor;
-		this.exa = new ExaClient(process.env.EXA_API_KEY);
-	}
-
-	async invoke(query: string): Promise<z.output<T>> {
-		const result = await this.exa.answer(query, {
-			systemPrompt: this.systemPrompt,
-			text: true,
-			outputSchema: this.outputSchema,
-		});
-
-		return this.outputSchema.parse(result.answer);
-	}
-}
 /** Base Harness Agent for Agent model orchestration. */
 
 export class BaseHarnessAgent<T extends ZodType | null = null> {

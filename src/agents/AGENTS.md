@@ -10,7 +10,8 @@
 
 ## High-signal locations
 
-- `src/agents/agents.ts -> BaseHarnessAgent/ExaAgent/Web*Agent/ImageAnalysisAgent/YouTubeSummarizer*`
+- `src/agents/agents.ts -> BaseHarnessAgent/Web*Agent/ImageAnalysisAgent/YouTubeSummarizer*`
+- `src/agents/exa.ts -> ExaAnswerAgent/ExaWebloadAgent`
 - `src/agents/index.ts -> tool registry + exported surface`
 - `src/agents/youtube/index.ts -> top-level YouTube entrypoints`
 
@@ -30,6 +31,7 @@
 - `WebLoaderAgent` adds the web loader tool while `BaseHarnessAgent` remains the generic chat path.
 - `ImageAnalysisAgent` routes media content through `MediaMessage`.
 - YouTube summarizer classes delegate to `agents/youtube/*` modules.
+- Exa agents live in `agents/exa.ts` so content loading and Exa Answer behavior stay separate from the generic chat wrappers.
 - `agents/index.ts` assembles the default tool registry from `tools/*`.
 
 ## Project-specific conventions and rationale
@@ -43,6 +45,8 @@
 - `agents.ts -> import ChatOpenAI from clients/openai.ts`
 - `agents.ts -> import MediaMessage from clients/multimodal.ts`
 - `agents.ts -> import summarizeVideo* from agents/youtube/*`
+- `exa.ts -> import Exa from exa-js`
+- `exa.ts -> import BaseHarnessAgent from agents.ts for optional structured parsing`
 - `index.ts -> getTools() returns webloaderTool + youtubeloaderTool from tools/*`
 
 ## General approach (not rigid checklist)
