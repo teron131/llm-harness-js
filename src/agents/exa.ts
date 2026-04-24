@@ -86,7 +86,7 @@ type ExaLoadParserArgs<T extends ZodType | null> = Omit<
 	responseFormat?: T;
 };
 
-const DEFAULT_EXA_WEBLOAD_SYSTEM_PROMPT = [
+const DEFAULT_EXA_LOAD_SYSTEM_PROMPT = [
 	"You answer using only the provided webpage contents fetched through Exa Contents.",
 	"Do not search the web, use memory, infer updated facts, or merge in uncited outside information.",
 	"If the requested value is missing from the provided content, return null or say it is unavailable.",
@@ -160,7 +160,7 @@ export class ExaLoadAgent<T extends ZodType | null = null> {
 		this.parserArgs = {
 			...agentArgs,
 			...(parserModel ? { model: parserModel } : {}),
-			systemPrompt: systemPrompt ?? DEFAULT_EXA_WEBLOAD_SYSTEM_PROMPT,
+			systemPrompt: systemPrompt ?? DEFAULT_EXA_LOAD_SYSTEM_PROMPT,
 			responseFormat: outputSchema ?? responseFormat,
 		};
 		this.contentOptions = {
