@@ -9,7 +9,7 @@ export {
 	YouTubeSummarizerGemini,
 	YouTubeSummarizerReAct,
 } from "../agents/agents.js";
-export { ExaAnswerAgent, ExaWebloadAgent } from "../agents/exa.js";
+export { ExaAnswerAgent, ExaLoadAgent } from "../agents/exa.js";
 export { ChatGemini, createGeminiCache, GeminiEmbeddings } from "./gemini.js";
 export { MediaMessage } from "./multimodal.js";
 export { ChatOpenAI, OpenAIEmbeddings } from "./openai.js";

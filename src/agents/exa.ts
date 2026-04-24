@@ -53,21 +53,21 @@ type ExaContentsClient = {
 type ExaClient = ExaAnswerClient & ExaContentsClient;
 type ExaConstructor = new (apiKey?: string) => ExaClient;
 
-export type ExaWebloadPage = {
+export type ExaLoadPage = {
 	url: string;
 	title: string | null;
 	text: string;
 	publishedDate: string | null;
 };
 
-export type ExaWebloadOptions = {
+export type ExaLoadOptions = {
 	maxCharacters?: number;
 	maxAgeHours?: number;
 	livecrawlTimeout?: number;
 	filterEmptyResults?: boolean;
 };
 
-type ExaWebloadAgentArgs<T extends ZodType | null> = {
+type ExaLoadAgentArgs<T extends ZodType | null> = {
 	model?: string;
 	temperature?: number;
 	reasoningEffort?: "minimal" | "low" | "medium" | "high";
@@ -75,12 +75,12 @@ type ExaWebloadAgentArgs<T extends ZodType | null> = {
 	responseFormat?: T;
 	outputSchema?: T;
 	exaApiKey?: string;
-	contentOptions?: ExaWebloadOptions;
+	contentOptions?: ExaLoadOptions;
 	[key: string]: unknown;
 };
 
-type ExaWebloadParserArgs<T extends ZodType | null> = Omit<
-	ExaWebloadAgentArgs<T>,
+type ExaLoadParserArgs<T extends ZodType | null> = Omit<
+	ExaLoadAgentArgs<T>,
 	"contentOptions" | "exaApiKey" | "outputSchema"
 > & {
 	responseFormat?: T;
@@ -137,11 +137,11 @@ export class ExaAnswerAgent<T extends ZodType> {
 	}
 }
 
-/** Exa Contents web loader agent for bot-blocked pages and structured parsing. */
-export class ExaWebloadAgent<T extends ZodType | null = null> {
+/** Exa Contents loader agent for bot-blocked pages and structured parsing. */
+export class ExaLoadAgent<T extends ZodType | null = null> {
 	private readonly exa: ExaContentsClient;
-	private readonly contentOptions: Required<ExaWebloadOptions>;
-	private readonly parserArgs: ExaWebloadParserArgs<T>;
+	private readonly contentOptions: Required<ExaLoadOptions>;
+	private readonly parserArgs: ExaLoadParserArgs<T>;
 	private parserAgent: SingleTurnHarnessAgent<T> | null = null;
 
 	constructor({
@@ -151,10 +151,15 @@ export class ExaWebloadAgent<T extends ZodType | null = null> {
 		contentOptions = {},
 		systemPrompt,
 		...agentArgs
-	}: ExaWebloadAgentArgs<T> = {}) {
+	}: ExaLoadAgentArgs<T> = {}) {
 		this.exa = createExaClient(exaApiKey);
+		const parserModel =
+			typeof agentArgs.model === "string"
+				? agentArgs.model
+				: process.env.QUALITY_LLM;
 		this.parserArgs = {
 			...agentArgs,
+			...(parserModel ? { model: parserModel } : {}),
 			systemPrompt: systemPrompt ?? DEFAULT_EXA_WEBLOAD_SYSTEM_PROMPT,
 			responseFormat: outputSchema ?? responseFormat,
 		};
@@ -172,7 +177,7 @@ export class ExaWebloadAgent<T extends ZodType | null = null> {
 	}
 
 	async load(urls: string | string[]): Promise<{
-		pages: ExaWebloadPage[];
+		pages: ExaLoadPage[];
 		costDollars: unknown;
 	}> {
 		const requestedUrls = Array.isArray(urls) ? urls : [urls];

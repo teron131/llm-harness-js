@@ -11,7 +11,7 @@
 ## High-signal locations
 
 - `src/agents/agents.ts -> BaseHarnessAgent/Web*Agent/ImageAnalysisAgent/YouTubeSummarizer*`
-- `src/agents/exa.ts -> ExaAnswerAgent/ExaWebloadAgent`
+- `src/agents/exa.ts -> ExaAnswerAgent/ExaLoadAgent`
 - `src/agents/index.ts -> tool registry + exported surface`
 - `src/agents/youtube/index.ts -> top-level YouTube entrypoints`
 
