@@ -14,6 +14,13 @@ type ClientOptions = {
 	configuration?: Record<string, unknown>;
 } & Record<string, unknown>;
 
+function shouldUseResponsesApi(model: string, baseURL: string): boolean {
+	return (
+		baseURL.toLowerCase().includes("opencode") &&
+		model.toLowerCase().includes("gpt")
+	);
+}
+
 /** Apply LLM_* environment defaults to an OpenAI-compatible client config. */
 function applyOpenAIEnvironment<T extends ClientOptions>(options: T): T {
 	const nextOptions = { ...options };
@@ -32,6 +39,28 @@ function applyOpenAIEnvironment<T extends ClientOptions>(options: T): T {
 	}
 
 	return nextOptions;
+}
+
+/** Default GPT models on OpenCode to the Responses API. */
+function applyResponsesApiDefault<T extends ClientOptions & { model: string }>(
+	options: T,
+): T {
+	if (options.useResponsesApi !== undefined) {
+		return options;
+	}
+
+	const baseURL = options.configuration?.baseURL;
+	if (
+		typeof baseURL !== "string" ||
+		!shouldUseResponsesApi(options.model, baseURL)
+	) {
+		return options;
+	}
+
+	return {
+		...options,
+		useResponsesApi: true,
+	};
 }
 
 /** Merge reasoning effort into the OpenAI-compatible chat config. */
@@ -65,11 +94,13 @@ export function ChatOpenAI({
 	[key: string]: unknown;
 }): NativeChatOpenAI {
 	const options = applyReasoningEffort(
-		applyOpenAIEnvironment({
-			model,
-			temperature,
-			...(kwargs as Record<string, unknown>),
-		}),
+		applyResponsesApiDefault(
+			applyOpenAIEnvironment({
+				model,
+				temperature,
+				...(kwargs as Record<string, unknown>),
+			}),
+		),
 		reasoningEffort,
 	);
 
