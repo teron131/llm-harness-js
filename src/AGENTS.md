@@ -54,5 +54,5 @@
 - Keep model defaults and environment variable semantics aligned with Python unless intentionally diverging; runtime OpenAI-compatible clients use `LLM_API_KEY` and `LLM_BASE_URL`.
 - When adding new features, prefer extending existing submodule boundaries instead of creating new cross-cutting helpers.
 - Required verification after edits:
-  - `npm run build`
+  - `pnpm run build`
   - `/Users/teron/Projects/Agents-Config/.factory/hooks/formatter.sh`

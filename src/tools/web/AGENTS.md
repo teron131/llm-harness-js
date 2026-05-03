@@ -47,5 +47,5 @@
 
 ## Validation commands
 
-- `cd llm-harness-js && npm run build`
+- `cd llm-harness-js && pnpm run build`
 - `/Users/teron/Projects/Agents-Config/.factory/hooks/formatter.sh`
