@@ -2,7 +2,7 @@
 
 import type { ClientTool, ServerTool } from "@langchain/core/tools";
 import { createAgent } from "langchain";
-import type { z, ZodType } from "zod";
+import type { ZodType, z } from "zod";
 
 import { MediaMessage } from "../clients/multimodal.js";
 import { ChatOpenAI } from "../clients/openai.js";

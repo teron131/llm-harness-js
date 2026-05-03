@@ -10,7 +10,6 @@ export function getTools() {
 
 export { webloader, webloaderTool } from "../tools/web/index.js";
 export { youtubeLoader, youtubeloaderTool } from "../tools/youtube/index.js";
-export { ExaAnswerAgent, ExaLoadAgent } from "./exa.js";
 export {
 	BaseHarnessAgent,
 	FixerAgent,
@@ -20,4 +19,5 @@ export {
 	YouTubeSummarizerGemini,
 	YouTubeSummarizerReAct,
 } from "./agents.js";
+export { ExaAnswerAgent, ExaLoadAgent } from "./exa.js";
 export * from "./fixer/index.js";

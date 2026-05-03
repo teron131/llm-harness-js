@@ -25,19 +25,19 @@ src/
 ## Install
 
 ```bash
-npm install
+pnpm install
 ```
 
 ## Build
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 ## Typecheck
 
 ```bash
-npm run typecheck
+pnpm run typecheck
 ```
 
 ## LLM Stats Table
@@ -45,15 +45,15 @@ npm run typecheck
 Print the current LLM stats payload as a terminal table:
 
 ```bash
-bun run stats:table
+pnpm run stats:table
 ```
 
 Useful flags:
 
 ```bash
-bun run stats:table -- --top 15
-bun run stats:table -- --id google/gemini-3.1-pro-preview
-bun run stats:table -- --cached
+pnpm run stats:table -- --top 15
+pnpm run stats:table -- --id google/gemini-3.1-pro-preview
+pnpm run stats:table -- --cached
 ```
 
 ## Runtime configuration

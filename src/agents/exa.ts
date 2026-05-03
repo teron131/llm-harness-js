@@ -2,7 +2,7 @@
 
 import Exa from "exa-js";
 import type { createAgent } from "langchain";
-import type { z, ZodType } from "zod";
+import type { ZodType, z } from "zod";
 import { z as zod } from "zod";
 
 import { BaseHarnessAgent } from "./agents.js";

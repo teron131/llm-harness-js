@@ -113,9 +113,7 @@ async function convertUrl(url: string): Promise<string | null> {
 		}
 
 		const turndown = new TurndownService();
-		const markdown = turndown.turndown(
-			stripHtmlNoise(pickPrimaryHtml(html)),
-		);
+		const markdown = turndown.turndown(stripHtmlNoise(pickPrimaryHtml(html)));
 		if (!markdown) {
 			return null;
 		}

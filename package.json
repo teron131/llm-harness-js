@@ -35,21 +35,21 @@
 	"engines": {
 		"node": ">=20"
 	},
-	"packageManager": "bun@1.2.21",
+	"packageManager": "pnpm@10.28.1",
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
-		"aa:stats": "bun ./scripts/run-aa-stats.mjs",
-		"image:reference": "bun ./scripts/run-image-stats-reference.mjs",
-		"stats:table": "bun ./scripts/test-stats.mjs",
-		"stats:parity": "bun ./scripts/run-stats-parity-snapshot.mjs",
-		"lint": "eslint . --max-warnings=0",
-		"lint:fix": "eslint . --fix",
-		"format": "git ls-files -z -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.jsonc' | xargs -0 biome format --write",
-		"format:check": "git ls-files -z -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.jsonc' | xargs -0 biome format",
+		"aa:stats": "pnpm exec tsx ./scripts/run-aa-stats.mjs",
+		"image:reference": "pnpm exec tsx ./scripts/run-image-stats-reference.mjs",
+		"stats:table": "pnpm exec tsx ./scripts/test-stats.mjs",
+		"stats:parity": "pnpm exec tsx ./scripts/run-stats-parity-snapshot.mjs",
+		"lint": "biome check package.json tsconfig.json src",
+		"lint:fix": "biome check --write package.json tsconfig.json src",
+		"format": "biome format --write package.json tsconfig.json src",
+		"format:check": "biome format package.json tsconfig.json src",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"dev": "bun --watch src/index.ts"
+		"dev": "pnpm exec tsx watch src/index.ts"
 	},
 	"dependencies": {
 		"@google/genai": "^1.48.0",
@@ -70,12 +70,9 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.11",
-		"@eslint/js": "^10.0.1",
 		"@types/node": "^25.5.2",
-		"eslint": "^10.2.0",
-		"globals": "^17.4.0",
+		"tsx": "^4.21.0",
 		"typescript": "^6.0.2",
-		"typescript-eslint": "^8.58.1",
 		"vitest": "^4.1.3"
 	}
 }
