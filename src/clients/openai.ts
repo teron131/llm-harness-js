@@ -14,26 +14,70 @@ type ClientOptions = {
 	configuration?: Record<string, unknown>;
 } & Record<string, unknown>;
 
-function shouldUseResponsesApi(model: string, baseURL: string): boolean {
-	return (
-		baseURL.toLowerCase().includes("opencode") &&
-		model.toLowerCase().includes("gpt")
+type ChatModelOptions = ClientOptions & {
+	model: string;
+	temperature?: number;
+	reasoningEffort?: ReasoningEffort;
+};
+
+function resolveApiKey(options: ClientOptions): string | undefined {
+	return options.apiKey ?? process.env.LLM_API_KEY;
+}
+
+function resolveBaseURL(options: ClientOptions): string | undefined {
+	const baseURL = options.configuration?.baseURL;
+	if (typeof baseURL === "string") {
+		return baseURL;
+	}
+
+	return process.env.LLM_BASE_URL;
+}
+
+function stripReservedModelKwargs(kwargs: Record<string, unknown>): void {
+	delete kwargs.model;
+	delete kwargs.temperature;
+	delete kwargs.reasoningEffort;
+	delete kwargs.reasoning_effort;
+}
+
+function shouldUseResponsesApi({
+	model,
+	baseURL,
+}: {
+	model: string;
+	baseURL?: string;
+}): boolean {
+	return Boolean(
+		baseURL?.toLowerCase().includes("opencode") &&
+			model.toLowerCase().includes("gpt"),
 	);
 }
 
-/** Apply LLM_* environment defaults to an OpenAI-compatible client config. */
-function applyOpenAIEnvironment<T extends ClientOptions>(options: T): T {
-	const nextOptions = { ...options };
-	const baseURL = process.env.LLM_BASE_URL;
-
-	if (process.env.LLM_API_KEY && nextOptions.apiKey === undefined) {
-		nextOptions.apiKey = process.env.LLM_API_KEY;
+function resolveUseResponsesApi(
+	options: ClientOptions & { model: string },
+	baseURL?: string,
+): boolean | undefined {
+	if (typeof options.useResponsesApi === "boolean") {
+		return options.useResponsesApi;
 	}
 
-	const configuration = nextOptions.configuration ?? {};
-	if (baseURL && configuration.baseURL === undefined) {
+	if (shouldUseResponsesApi({ model: options.model, baseURL })) {
+		return true;
+	}
+}
+
+function buildClientOptions<T extends ClientOptions>(options: T): T {
+	const nextOptions = { ...options };
+	const apiKey = resolveApiKey(nextOptions);
+	const baseURL = resolveBaseURL(nextOptions);
+
+	if (apiKey) {
+		nextOptions.apiKey = apiKey;
+	}
+
+	if (baseURL) {
 		nextOptions.configuration = {
-			...configuration,
+			...(nextOptions.configuration ?? {}),
 			baseURL,
 		};
 	}
@@ -41,50 +85,42 @@ function applyOpenAIEnvironment<T extends ClientOptions>(options: T): T {
 	return nextOptions;
 }
 
-/** Default GPT models on OpenCode to the Responses API. */
-function applyResponsesApiDefault<T extends ClientOptions & { model: string }>(
-	options: T,
-): T {
-	if (options.useResponsesApi !== undefined) {
-		return options;
+function buildChatModelOptions({
+	model,
+	temperature = 0.7,
+	reasoningEffort,
+	...kwargs
+}: ChatModelOptions): ClientOptions & { model: string } {
+	stripReservedModelKwargs(kwargs);
+	const options: ClientOptions & { model: string } = buildClientOptions({
+		model,
+		...kwargs,
+	});
+	const baseURL = resolveBaseURL(options);
+	const useResponsesApi = resolveUseResponsesApi(options, baseURL);
+
+	if (useResponsesApi !== undefined) {
+		options.useResponsesApi = useResponsesApi;
 	}
 
-	const baseURL = options.configuration?.baseURL;
-	if (
-		typeof baseURL !== "string" ||
-		!shouldUseResponsesApi(options.model, baseURL)
-	) {
-		return options;
+	if (!useResponsesApi) {
+		options.temperature = temperature;
 	}
 
-	return {
-		...options,
-		useResponsesApi: true,
-	};
-}
-
-/** Merge reasoning effort into the OpenAI-compatible chat config. */
-function applyReasoningEffort<T extends ClientOptions>(
-	options: T,
-	reasoningEffort?: ReasoningEffort,
-): T {
-	if (!reasoningEffort) {
-		return options;
-	}
-
-	return {
-		...options,
-		reasoning: {
+	if (reasoningEffort) {
+		options.reasoning = {
 			...((options.reasoning as Record<string, unknown> | undefined) ?? {}),
 			effort: reasoningEffort,
-		},
-	};
+		};
+	}
+
+	return options;
 }
 
 /** Initialize an OpenAI-compatible chat model. */
 export function ChatOpenAI({
 	model,
-	temperature = 0.7,
+	temperature,
 	reasoningEffort,
 	...kwargs
 }: {
@@ -93,18 +129,14 @@ export function ChatOpenAI({
 	reasoningEffort?: ReasoningEffort;
 	[key: string]: unknown;
 }): NativeChatOpenAI {
-	const options = applyReasoningEffort(
-		applyResponsesApiDefault(
-			applyOpenAIEnvironment({
-				model,
-				temperature,
-				...(kwargs as Record<string, unknown>),
-			}),
-		),
-		reasoningEffort,
+	return new NativeChatOpenAI(
+		buildChatModelOptions({
+			model,
+			temperature,
+			reasoningEffort,
+			...(kwargs as Record<string, unknown>),
+		}),
 	);
-
-	return new NativeChatOpenAI(options);
 }
 
 /** Initialize an OpenAI-compatible embedding model. */
@@ -116,7 +148,7 @@ export function OpenAIEmbeddings({
 	[key: string]: unknown;
 } = {}): NativeOpenAIEmbeddings {
 	return new NativeOpenAIEmbeddings(
-		applyOpenAIEnvironment({
+		buildClientOptions({
 			model,
 			...(kwargs as Record<string, unknown>),
 		}),
