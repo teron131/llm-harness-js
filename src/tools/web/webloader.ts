@@ -17,6 +17,7 @@ const CONSENT_MARKERS = [
 	"iab transparency",
 	"consent-layer",
 ];
+const ARTICLE_TYPES = new Set(["Article", "NewsArticle", "BlogPosting"]);
 
 function countMarkerMatches(text: string, markers: readonly string[]): number {
 	const normalizedText = text.toLowerCase();
@@ -33,15 +34,116 @@ function trimMarkdown(markdown: string, maxChars = MAX_MARKDOWN_CHARS): string {
 	return `${markdown.slice(0, maxChars).trimEnd()}...`;
 }
 
+function decodeHtmlEntities(text: string): string {
+	return text
+		.replace(/&#x([0-9a-f]+);/gi, (_match, value: string) =>
+			String.fromCodePoint(Number.parseInt(value, 16)),
+		)
+		.replace(/&#([0-9]+);/g, (_match, value: string) =>
+			String.fromCodePoint(Number.parseInt(value, 10)),
+		)
+		.replace(/&nbsp;/g, " ")
+		.replace(/&amp;/g, "&")
+		.replace(/&quot;/g, '"')
+		.replace(/&#x27;|&#39;/g, "'")
+		.replace(/&lt;/g, "<")
+		.replace(/&gt;/g, ">");
+}
+
+function jsonLdBlocks(html: string): unknown[] {
+	const blocks = [
+		...html.matchAll(
+			/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+		),
+	];
+	const parsedBlocks: unknown[] = [];
+	for (const block of blocks) {
+		const payload = block[1];
+		if (!payload) {
+			continue;
+		}
+		try {
+			parsedBlocks.push(JSON.parse(payload.trim()));
+		} catch {
+			try {
+				parsedBlocks.push(JSON.parse(decodeHtmlEntities(payload.trim())));
+			} catch {}
+		}
+	}
+	return parsedBlocks;
+}
+
+function collectJsonLdNodes(value: unknown): Record<string, unknown>[] {
+	if (Array.isArray(value)) {
+		return value.flatMap((item) => collectJsonLdNodes(item));
+	}
+	if (!value || typeof value !== "object") {
+		return [];
+	}
+	const node = value as Record<string, unknown>;
+	const graph = Array.isArray(node["@graph"])
+		? node["@graph"].flatMap((item) => collectJsonLdNodes(item))
+		: [];
+	return [node, ...graph];
+}
+
+function nodeHasArticleType(node: Record<string, unknown>): boolean {
+	const type = node["@type"];
+	if (typeof type === "string") {
+		return ARTICLE_TYPES.has(type);
+	}
+	return (
+		Array.isArray(type) && type.some((item) => ARTICLE_TYPES.has(String(item)))
+	);
+}
+
+function structuredArticleMarkdown(html: string): string | null {
+	const articleNodes = jsonLdBlocks(html)
+		.flatMap((block) => collectJsonLdNodes(block))
+		.filter(nodeHasArticleType);
+	for (const node of articleNodes) {
+		const articleBody =
+			typeof node.articleBody === "string" ? node.articleBody : "";
+		if (articleBody.trim().length < MIN_MARKDOWN_CHARS) {
+			continue;
+		}
+		const parts = [
+			typeof node.headline === "string" ? node.headline : "",
+			typeof node.description === "string" ? node.description : "",
+			articleBody,
+		].filter((part) => part.trim().length > 0);
+		return parts.map((part) => decodeHtmlEntities(part).trim()).join("\n\n");
+	}
+	return null;
+}
+
+function tagBlocks(html: string, tagName: string): string[] {
+	const pattern = new RegExp(
+		`<${tagName}\\b[^>]*>[\\s\\S]*?<\\/${tagName}>`,
+		"gi",
+	);
+	return [...html.matchAll(pattern)].map((match) => match[0]);
+}
+
+function scorePrimaryHtml(html: string): number {
+	const text = stripHtmlNoise(html)
+		.replace(/<[^>]+>/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+	return text.length;
+}
+
 function pickPrimaryHtml(html: string): string {
-	const articleMatch = html.match(/<article\b[^>]*>[\s\S]*?<\/article>/i);
-	if (articleMatch?.[0]) {
-		return articleMatch[0];
+	const candidates = [
+		...tagBlocks(html, "main"),
+		...tagBlocks(html, "article"),
+	];
+	if (candidates.length > 0) {
+		return candidates.reduce((best, candidate) =>
+			scorePrimaryHtml(candidate) > scorePrimaryHtml(best) ? candidate : best,
+		);
 	}
-	const mainMatch = html.match(/<main\b[^>]*>[\s\S]*?<\/main>/i);
-	if (mainMatch?.[0]) {
-		return mainMatch[0];
-	}
+
 	const bodyMatch = html.match(/<body\b[^>]*>[\s\S]*?<\/body>/i);
 	return bodyMatch?.[0] ?? html;
 }
@@ -68,8 +170,26 @@ function isGarbageLine(line: string): boolean {
 		return true;
 	}
 	if (
+		lowerLine === "share" ||
+		lowerLine === "share this article" ||
+		lowerLine === "copy link" ||
+		lowerLine.startsWith("table of contents")
+	) {
+		return true;
+	}
+	if (/^!\[[^\]]*]\([^)]*\)/.test(normalizedLine)) {
+		return true;
+	}
+	if (
 		normalizedLine.length > 180 &&
-		(/[{;}]/.test(normalizedLine) || normalizedLine.includes("--"))
+		((normalizedLine.match(/https?:\/\//g) ?? []).length >= 2 ||
+			(normalizedLine.match(/%[0-9a-f]{2}/gi) ?? []).length >= 4)
+	) {
+		return true;
+	}
+	if (
+		normalizedLine.length > 180 &&
+		(/[{}]/.test(normalizedLine) || normalizedLine.includes("--"))
 	) {
 		return true;
 	}
@@ -110,6 +230,14 @@ async function convertUrl(url: string): Promise<string | null> {
 		const html = await response.text();
 		if (countMarkerMatches(html, CONSENT_MARKERS) >= 3) {
 			return null;
+		}
+
+		const structuredMarkdown = structuredArticleMarkdown(html);
+		if (structuredMarkdown) {
+			const cleanedStructuredMarkdown = cleanMarkdown(structuredMarkdown);
+			if (cleanedStructuredMarkdown.length >= MIN_MARKDOWN_CHARS) {
+				return cleanedStructuredMarkdown;
+			}
 		}
 
 		const turndown = new TurndownService();
