@@ -10,12 +10,6 @@ import {
 	applyPatchChunksToText,
 	parseSingleFilePatchWithStats,
 } from "./apply-patch.js";
-import {
-	editHashline,
-	formatHashlineText,
-	type HashlineEdit,
-	HashlineEditSchema,
-} from "./hashline.js";
 
 const PATH_TRAVERSAL_ERROR = "Path traversal not allowed";
 const PATH_OUTSIDE_ROOT_ERROR = "Path outside root";
@@ -31,11 +25,6 @@ const WriteTextSchema = z.object({
 
 const PatchSchema = z.object({
 	patch: z.string(),
-});
-
-const HashlineEditRequestSchema = z.object({
-	path: z.string(),
-	edits: z.array(HashlineEditSchema),
 });
 
 const EditWithEdSchema = z.object({
@@ -100,9 +89,13 @@ export class SandboxFS {
 		await writeFile(filePath, text, "utf-8");
 	}
 
-	async applyPatch(patch: string): Promise<string> {
+	async applyPatch(
+		patch: string,
+		options: { targetPath?: string } = {},
+	): Promise<string> {
 		const [filePatch] = parseSingleFilePatchWithStats({
 			patch_text: patch,
+			target_path: options.targetPath,
 		});
 		const path = `/${filePatch.path.replace(/^\/+/, "")}`;
 		await this.updateExistingText(path, (originalText) =>
@@ -113,16 +106,6 @@ export class SandboxFS {
 			}),
 		);
 		return `Patched ${path}`;
-	}
-
-	async readHashline(path: string): Promise<string> {
-		return formatHashlineText(await this.readText(path));
-	}
-
-	async editHashline(path: string, edits: HashlineEdit[]): Promise<string> {
-		return this.updateExistingText(path, (originalText) =>
-			editHashline(originalText, edits),
-		);
 	}
 
 	private async updateExistingText(
@@ -209,20 +192,6 @@ export function makeFsTools({ rootDir }: { rootDir: string }) {
 		({ patch }) => sandboxFs.applyPatch(patch),
 	);
 
-	const fsReadHashline = createFsTool(
-		"fs_read_hashline",
-		"Read a UTF-8 text file rendered as `LINE#HASH:content` entries.",
-		ReadTextSchema,
-		({ path }) => sandboxFs.readHashline(path),
-	);
-
-	const fsEditHashline = createFsTool(
-		"fs_edit_hashline",
-		"Apply hashline edits to an existing UTF-8 text file.",
-		HashlineEditRequestSchema,
-		({ path, edits }) => sandboxFs.editHashline(path, edits),
-	);
-
 	const fsEditWithEd = createFsTool(
 		"fs_edit_with_ed",
 		"Edit a file by running an `ed` script against it.",
@@ -234,12 +203,5 @@ export function makeFsTools({ rootDir }: { rootDir: string }) {
 		},
 	);
 
-	return [
-		fsReadText,
-		fsWriteText,
-		fsPatch,
-		fsReadHashline,
-		fsEditHashline,
-		fsEditWithEd,
-	] as const;
+	return [fsReadText, fsWriteText, fsPatch, fsEditWithEd] as const;
 }

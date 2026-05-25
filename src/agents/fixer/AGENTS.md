@@ -2,7 +2,7 @@
 
 ## Scope
 
-- Generic single-file fixer workflow that iteratively edits UTF-8 text using hashline references and review-driven loop control.
+- Generic single-file fixer workflow that iteratively edits UTF-8 text using structured apply-patch edits and review-driven loop control.
 
 ## What Module Is For
 
@@ -18,7 +18,7 @@
 ## Repository snapshot
 
 - Primary API: `fixFile`, `fixText`, `FixerAgent`
-- Edit primitive: hashline edits applied through `SandboxFS`
+- Edit primitive: structured apply-patch edit applied through `SandboxFS`
 - Default public task: grammar/spelling/typo cleanup unless the caller supplies context
 
 ## Key takeaways per location

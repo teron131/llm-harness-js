@@ -4,21 +4,14 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { z } from "zod";
 import { ChatOpenAI } from "../../clients/openai.js";
 import { getMetadata } from "../../clients/parsers/metadata.js";
 import { SandboxFS } from "../../tools/fs/fs-tools.js";
 import {
-	editHashline,
-	type HashlineEdit,
-	HashlineEditResponseSchema,
-	HashlineReferenceError,
-} from "../../tools/fs/hashline.js";
-import {
 	buildFixerAgentPrompt,
 	buildFixerPassPrompt,
 	buildFixerProgressPrompt,
-	buildHashlineRepairPrompt,
-	buildHashlineRepairSystemPrompt,
 	buildReviewSystemPrompt,
 	CLEAN_TASK_LOG,
 	DEFAULT_FIXER_SYSTEM_PROMPT,
@@ -38,6 +31,14 @@ import {
 
 const EMPTY_EDIT_SENTINEL = "__FIXER_EMPTY_EDIT__";
 const MAX_REPEAT_REMAINING_REVIEWS = 2;
+
+const PatchEditResponseSchema = z
+	.object({
+		patch: z.string().nullable().optional(),
+	})
+	.transform((value) => ({
+		patch: value.patch ?? null,
+	}));
 
 type WriteApplyResult = {
 	afterText: string | null;
@@ -115,7 +116,7 @@ function asMetadataRecord(value: unknown): Record<string, unknown> {
 	return value as unknown as Record<string, unknown>;
 }
 
-function parseHashlineEditResponse(content: unknown) {
+function parsePatchEditResponse(content: unknown) {
 	const rawText =
 		typeof content === "string"
 			? content
@@ -131,10 +132,10 @@ function parseHashlineEditResponse(content: unknown) {
 						.join("")
 				: String(content ?? "");
 	const cleaned = stripCodeFences(rawText);
-	const parsed = JSON.parse(cleaned || '{"edits":[]}');
+	const parsed = JSON.parse(cleaned || '{"patch":null}');
 	return {
 		rawText: cleaned,
-		response: HashlineEditResponseSchema.parse(parsed),
+		response: PatchEditResponseSchema.parse(parsed),
 	};
 }
 
@@ -147,31 +148,30 @@ async function writeEdits({
 	fs,
 	targetPath,
 	currentText,
-	edits,
+	patch,
 	usage = [0, 0, 0],
 }: {
 	fs: SandboxFS;
 	targetPath: string;
 	currentText: string;
-	edits: HashlineEdit[];
+	patch: string | null;
 	usage?: [number, number, number];
 }): Promise<WriteApplyResult> {
-	const updatedText = editHashline(currentText, edits);
-
+	if (patch === null || patch.trim() === "") {
+		return {
+			afterText: currentText,
+			writeError: EMPTY_EDIT_SENTINEL,
+			tokensIn: usage[0],
+			tokensOut: usage[1],
+			cost: usage[2],
+		};
+	}
+	await fs.applyPatch(patch, { targetPath });
+	const updatedText = await fs.readText(targetPath);
 	try {
 		JSON.parse(currentText);
 	} catch {
 		// Non-JSON text can continue without validation.
-		if (updatedText === currentText) {
-			return {
-				afterText: currentText,
-				writeError: EMPTY_EDIT_SENTINEL,
-				tokensIn: usage[0],
-				tokensOut: usage[1],
-				cost: usage[2],
-			};
-		}
-		await fs.writeText(targetPath, updatedText);
 		return {
 			afterText: updatedText,
 			tokensIn: usage[0],
@@ -183,6 +183,7 @@ async function writeEdits({
 	try {
 		JSON.parse(updatedText);
 	} catch (error) {
+		await fs.writeText(targetPath, currentText);
 		throw new Error(`write broke JSON validity: ${(error as Error).message}`);
 	}
 
@@ -195,8 +196,6 @@ async function writeEdits({
 			cost: usage[2],
 		};
 	}
-
-	await fs.writeText(targetPath, updatedText);
 	return {
 		afterText: updatedText,
 		tokensIn: usage[0],
@@ -289,7 +288,7 @@ async function runFixPass({
 				maxTurns: input.maxIterations,
 			})}\n\n${buildFixerPassPrompt({
 				targetFile: input.targetFile,
-				currentText: await fs.readHashline(targetPath),
+				currentText: await fs.readText(targetPath),
 				passNumber,
 				maxTurns: input.maxIterations,
 				taskLog: progress.fixerNotes,
@@ -298,52 +297,7 @@ async function runFixPass({
 	]);
 
 	addUsage(progress, getMetadata(asMetadataRecord(response)));
-	return parseHashlineEditResponse((response as { content?: unknown }).content);
-}
-
-async function runRepairPass({
-	input,
-	progress,
-	fs,
-	targetPath,
-	errorText,
-	attemptedEdits,
-}: {
-	input: FixerInput;
-	progress: FixerProgress;
-	fs: SandboxFS;
-	targetPath: string;
-	errorText: string;
-	attemptedEdits: string;
-}) {
-	const response = await ChatOpenAI({
-		model: input.fixerModel,
-		temperature: 0,
-		reasoningEffort: "low",
-	}).invoke([
-		new SystemMessage(
-			buildHashlineRepairSystemPrompt(
-				input.fixerSystemPrompt || DEFAULT_FIXER_SYSTEM_PROMPT,
-			),
-		),
-		new HumanMessage(
-			buildHashlineRepairPrompt({
-				errorText,
-				taskLog: progress.fixerNotes || CLEAN_TASK_LOG,
-				currentText: await fs.readHashline(targetPath),
-				attemptedEdits,
-			}),
-		),
-	]);
-
-	const usage = getMetadata(asMetadataRecord(response));
-	const { response: parsed } = parseHashlineEditResponse(
-		(response as { content?: unknown }).content,
-	);
-	return {
-		parsed,
-		usage,
-	};
+	return parsePatchEditResponse((response as { content?: unknown }).content);
 }
 
 async function restoreBestSnapshot({
@@ -446,7 +400,7 @@ export async function fixFile({
 
 	for (let passNumber = 1; passNumber <= input.maxIterations; passNumber += 1) {
 		progress.iteration = passNumber;
-		const { response: editResponse, rawText } = await runFixPass({
+		const { response: editResponse } = await runFixPass({
 			input,
 			progress,
 			fs,
@@ -454,7 +408,7 @@ export async function fixFile({
 			passNumber,
 		});
 
-		if (editResponse.edits.length === 0) {
+		if (editResponse.patch === null) {
 			if (
 				await reviewAndMaybeStop({
 					input,
@@ -474,45 +428,13 @@ export async function fixFile({
 				fs,
 				targetPath: virtualTargetPath,
 				currentText,
-				edits: editResponse.edits,
+				patch: editResponse.patch,
 			});
 		} catch (error) {
-			if (
-				!(error instanceof HashlineReferenceError) &&
-				!(error instanceof Error)
-			) {
+			if (!(error instanceof Error)) {
 				throw error;
 			}
-			const repaired = await runRepairPass({
-				input,
-				progress,
-				fs,
-				targetPath: virtualTargetPath,
-				errorText: error.message,
-				attemptedEdits: rawText,
-			});
-			addUsage(progress, repaired.usage);
-			if (repaired.parsed.edits.length === 0) {
-				writeResult = { afterText: null, writeError: error.message };
-			} else {
-				try {
-					writeResult = await writeEdits({
-						fs,
-						targetPath: virtualTargetPath,
-						currentText,
-						edits: repaired.parsed.edits,
-						usage: repaired.usage,
-					});
-				} catch (repairError) {
-					writeResult = {
-						afterText: null,
-						writeError:
-							repairError instanceof Error
-								? repairError.message
-								: String(repairError),
-					};
-				}
-			}
+			writeResult = { afterText: null, writeError: error.message };
 		}
 
 		addUsage(progress, [

@@ -29,7 +29,7 @@
 ## Key takeaways per location
 
 - `index.ts` defines the tool surface consumed by agents.
-- `fsTools.ts` is the root-dir trust boundary and must stay strict about path traversal.
+- `fs-tools.ts` is the root-dir trust boundary and must stay strict about path traversal.
 - `fastCopy.ts` powers transcript garbage filtering via `[Lx]` range tags.
 - `webloader.ts` intentionally returns `null` per failed URL instead of failing batch calls.
 - `youtube/scraper.ts` encapsulates provider fallback (ScrapeCreators first, Supadata second).
