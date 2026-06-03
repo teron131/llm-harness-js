@@ -1,7 +1,7 @@
 {
 	"name": "llm-harness-js",
 	"version": "0.1.0",
-	"description": "TypeScript harness for tools, agents, and model stats workflows",
+	"description": "TypeScript harness for tools and agent workflows",
 	"type": "module",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -38,10 +38,6 @@
 	"packageManager": "pnpm@10.28.1",
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
-		"aa:stats": "pnpm exec tsx ./scripts/run-aa-stats.mjs",
-		"image:reference": "pnpm exec tsx ./scripts/run-image-stats-reference.mjs",
-		"stats:table": "pnpm exec tsx ./scripts/test-stats.mjs",
-		"stats:parity": "pnpm exec tsx ./scripts/run-stats-parity-snapshot.mjs",
 		"lint": "biome check package.json tsconfig.json src",
 		"lint:fix": "biome check --write package.json tsconfig.json src",
 		"format": "biome format --write package.json tsconfig.json src",
@@ -62,7 +58,6 @@
 		"@mariozechner/pi-coding-agent": "^0.65.2",
 		"exa-js": "^2.12.1",
 		"langchain": "^1.3.5",
-		"mathjs": "^15.2.0",
 		"opencc-js": "^1.3.0",
 		"sharp": "^0.34.5",
 		"turndown": "^7.2.4",

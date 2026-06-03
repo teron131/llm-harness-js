@@ -12,9 +12,6 @@ src/
 │   └── youtube/
 ├── clients/   runtime adapters
 │   └── parsers/
-├── stats/     LLM and image stats
-│   ├── llm/
-│   └── image/
 ├── tools/     integration boundaries
 │   ├── fs/
 │   ├── web/
@@ -38,22 +35,6 @@ pnpm run build
 
 ```bash
 pnpm run typecheck
-```
-
-## LLM Stats Table
-
-Print the current LLM stats payload as a terminal table:
-
-```bash
-pnpm run stats:table
-```
-
-Useful flags:
-
-```bash
-pnpm run stats:table -- --top 15
-pnpm run stats:table -- --id google/gemini-3.1-pro-preview
-pnpm run stats:table -- --cached
 ```
 
 ## Runtime configuration
