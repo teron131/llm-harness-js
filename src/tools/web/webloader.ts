@@ -6,6 +6,7 @@ import { z } from "zod";
 
 const MAX_MARKDOWN_CHARS = 6_000;
 const MIN_MARKDOWN_CHARS = 120;
+const FETCH_TIMEOUT_MS = 4_000;
 const CONSENT_MARKERS = [
 	"your privacy choices",
 	"manage privacy settings",
@@ -216,12 +217,15 @@ function cleanMarkdown(markdown: string): string {
 }
 
 async function convertUrl(url: string): Promise<string | null> {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 	try {
 		const response = await fetch(url, {
 			headers: {
 				"user-agent": "Mozilla/5.0",
 				"accept-language": "en-US,en;q=0.9",
 			},
+			signal: controller.signal,
 		});
 		if (!response.ok) {
 			return null;
@@ -256,6 +260,8 @@ async function convertUrl(url: string): Promise<string | null> {
 		return cleanedMarkdown;
 	} catch {
 		return null;
+	} finally {
+		clearTimeout(timeoutId);
 	}
 }
 
