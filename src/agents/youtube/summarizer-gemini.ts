@@ -15,6 +15,60 @@ const USD_PER_M_TOKENS_BY_MODEL: Record<
 	"gemini-3-flash-preview": { input: 0.5, output: 3 },
 	"gemini-3-pro-preview": { input: 2, output: 12 },
 };
+
+type ThinkingLevel = "minimal" | "low" | "medium" | "high";
+
+export type GeminiSummarizeVideoOptions = {
+	videoUrl: string;
+	model?: string;
+	thinkingLevel?: ThinkingLevel;
+	targetLanguage?: string;
+	apiKey?: string;
+};
+
+type AnalyzeVideoUrlOptions = GeminiSummarizeVideoOptions & {
+	timeout?: number;
+};
+
+const SUMMARY_RESPONSE_SCHEMA = {
+	type: Type.OBJECT,
+	properties: {
+		overview: { type: Type.STRING },
+		chapters: {
+			type: Type.ARRAY,
+			items: {
+				type: Type.OBJECT,
+				properties: {
+					title: { type: Type.STRING },
+					description: { type: Type.STRING },
+					start_time: {
+						type: Type.STRING,
+						nullable: true,
+					},
+					end_time: {
+						type: Type.STRING,
+						nullable: true,
+					},
+				},
+				required: ["title", "description"],
+			},
+		},
+	},
+	required: ["overview", "chapters"],
+};
+
+function resolveGeminiApiKey(apiKey?: string): string {
+	const resolvedApiKey =
+		apiKey ?? process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY;
+	if (!resolvedApiKey) {
+		throw new Error("API key not found. Set GOOGLE_API_KEY or GEMINI_API_KEY");
+	}
+	return resolvedApiKey;
+}
+
+function thinkingBudgetFor(level: ThinkingLevel): number {
+	return level === "high" ? -1 : 0;
+}
 /** Compute the cost for the current request. */
 
 function calculateCost(
@@ -32,6 +86,35 @@ function calculateCost(
 		(outputTokens / 1_000_000) * pricing.output
 	);
 }
+
+function trackGeminiUsage(
+	model: string,
+	usage:
+		| {
+				promptTokenCount?: number;
+				totalTokenCount?: number;
+		  }
+		| null
+		| undefined,
+) {
+	if (
+		usage?.promptTokenCount === undefined ||
+		usage.totalTokenCount === undefined
+	) {
+		return;
+	}
+
+	const cost = calculateCost(
+		model,
+		usage.promptTokenCount,
+		usage.totalTokenCount,
+	);
+	trackUsage(
+		usage.promptTokenCount,
+		usage.totalTokenCount - usage.promptTokenCount,
+		cost,
+	);
+}
 /** Analyze a YouTube video URL with Gemini. */
 
 async function analyzeVideoUrl({
@@ -41,21 +124,8 @@ async function analyzeVideoUrl({
 	targetLanguage = "auto",
 	apiKey,
 	timeout = 600,
-}: {
-	videoUrl: string;
-	model?: string;
-	thinkingLevel?: "minimal" | "low" | "medium" | "high";
-	targetLanguage?: string;
-	apiKey?: string;
-	timeout?: number;
-}): Promise<Summary | null> {
-	const resolvedApiKey =
-		apiKey ?? process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY;
-	if (!resolvedApiKey) {
-		throw new Error("API key not found. Set GOOGLE_API_KEY or GEMINI_API_KEY");
-	}
-
-	const client = new GoogleGenAI({ apiKey: resolvedApiKey });
+}: AnalyzeVideoUrlOptions): Promise<Summary | null> {
+	const client = new GoogleGenAI({ apiKey: resolveGeminiApiKey(apiKey) });
 
 	try {
 		const response = await client.models.generateContent({
@@ -73,35 +143,10 @@ async function analyzeVideoUrl({
 			config: {
 				httpOptions: { timeout: timeout * 1000 },
 				thinkingConfig: {
-					thinkingBudget: thinkingLevel === "high" ? -1 : 0,
+					thinkingBudget: thinkingBudgetFor(thinkingLevel),
 				},
 				responseMimeType: "application/json",
-				responseSchema: {
-					type: Type.OBJECT,
-					properties: {
-						overview: { type: Type.STRING },
-						chapters: {
-							type: Type.ARRAY,
-							items: {
-								type: Type.OBJECT,
-								properties: {
-									title: { type: Type.STRING },
-									description: { type: Type.STRING },
-									start_time: {
-										type: Type.STRING,
-										nullable: true,
-									},
-									end_time: {
-										type: Type.STRING,
-										nullable: true,
-									},
-								},
-								required: ["title", "description"],
-							},
-						},
-					},
-					required: ["overview", "chapters"],
-				},
+				responseSchema: SUMMARY_RESPONSE_SCHEMA,
 			},
 		});
 
@@ -112,22 +157,7 @@ async function analyzeVideoUrl({
 
 		const analysis = SummarySchema.parse(JSON.parse(text));
 
-		const usage = response.usageMetadata;
-		if (
-			usage?.promptTokenCount !== undefined &&
-			usage?.totalTokenCount !== undefined
-		) {
-			const cost = calculateCost(
-				model,
-				usage.promptTokenCount,
-				usage.totalTokenCount,
-			);
-			trackUsage(
-				usage.promptTokenCount,
-				usage.totalTokenCount - usage.promptTokenCount,
-				cost,
-			);
-		}
+		trackGeminiUsage(model, response.usageMetadata);
 
 		return analysis;
 	} catch {
@@ -142,29 +172,12 @@ export function summarizeVideo({
 	thinkingLevel = "medium",
 	targetLanguage = "auto",
 	apiKey,
-}: {
-	videoUrl: string;
-	model?: string;
-	thinkingLevel?: "minimal" | "low" | "medium" | "high";
-	targetLanguage?: string;
-	apiKey?: string;
-}): Promise<Summary | null> {
-	const payload: {
-		videoUrl: string;
-		model?: string;
-		thinkingLevel?: "minimal" | "low" | "medium" | "high";
-		targetLanguage?: string;
-		apiKey?: string;
-	} = {
+}: GeminiSummarizeVideoOptions): Promise<Summary | null> {
+	return analyzeVideoUrl({
 		videoUrl,
 		model,
 		thinkingLevel,
 		targetLanguage,
-	};
-
-	if (apiKey) {
-		payload.apiKey = apiKey;
-	}
-
-	return analyzeVideoUrl(payload);
+		...(apiKey ? { apiKey } : {}),
+	});
 }

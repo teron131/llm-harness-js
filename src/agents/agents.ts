@@ -12,7 +12,10 @@ import { DEFAULT_FIXER_TASK_PROMPT } from "./fixer/prompts.js";
 import { DEFAULT_FIXER_MAX_ITERATIONS } from "./fixer/state.js";
 import type { Summary } from "./youtube/schemas.js";
 import { summarizeVideo as summarizeVideoLite } from "./youtube/summarizer.js";
-import { summarizeVideo as summarizeVideoGemini } from "./youtube/summarizer-gemini.js";
+import {
+	type GeminiSummarizeVideoOptions,
+	summarizeVideo as summarizeVideoGemini,
+} from "./youtube/summarizer-gemini.js";
 import { summarizeVideo as summarizeVideoReact } from "./youtube/summarizer-react.js";
 
 type GenericTool = ClientTool | ServerTool;
@@ -263,46 +266,20 @@ export class YouTubeSummarizer {
 /** Gemini summarizer wrapper for YouTube transcript workflows. */
 
 export class YouTubeSummarizerGemini {
-	private readonly options: {
-		model?: string;
-		thinkingLevel?: "minimal" | "low" | "medium" | "high";
-		targetLanguage?: string;
-		apiKey?: string;
-	};
+	private readonly options: Omit<GeminiSummarizeVideoOptions, "videoUrl">;
 
-	constructor(
-		options: {
-			model?: string;
-			thinkingLevel?: "minimal" | "low" | "medium" | "high";
-			targetLanguage?: string;
-			apiKey?: string;
-		} = {},
-	) {
+	constructor(options: Omit<GeminiSummarizeVideoOptions, "videoUrl"> = {}) {
 		this.options = options;
 	}
 
 	invoke(videoUrl: string): Promise<Summary | null> {
-		const payload: {
-			videoUrl: string;
-			model?: string;
-			thinkingLevel?: "minimal" | "low" | "medium" | "high";
-			targetLanguage?: string;
-			apiKey?: string;
-		} = { videoUrl };
-
-		if (this.options.model) {
-			payload.model = this.options.model;
-		}
-		if (this.options.thinkingLevel) {
-			payload.thinkingLevel = this.options.thinkingLevel;
-		}
-		if (this.options.targetLanguage) {
-			payload.targetLanguage = this.options.targetLanguage;
-		}
-		if (this.options.apiKey) {
-			payload.apiKey = this.options.apiKey;
-		}
-
-		return summarizeVideoGemini(payload);
+		const { model, thinkingLevel, targetLanguage, apiKey } = this.options;
+		return summarizeVideoGemini({
+			videoUrl,
+			...(model ? { model } : {}),
+			...(thinkingLevel ? { thinkingLevel } : {}),
+			...(targetLanguage ? { targetLanguage } : {}),
+			...(apiKey ? { apiKey } : {}),
+		});
 	}
 }
