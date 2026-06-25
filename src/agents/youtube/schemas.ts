@@ -38,9 +38,9 @@ export const QualitySchema = z.object({
 });
 
 type Quality = z.infer<typeof QualitySchema>;
-/** Helper for all aspects. */
 
-function allAspects(quality: Quality) {
+/** Return the quality ratings that contribute to the overall summary score. */
+function qualityAspectRatings(quality: Quality) {
 	return [
 		quality.completeness,
 		quality.structure,
@@ -50,16 +50,16 @@ function allAspects(quality: Quality) {
 		quality.correct_language,
 	];
 }
-/** Helper for percentage score. */
 
-export function percentageScore(quality: Quality): number {
-	const aspects = allAspects(quality);
+/** Return the weighted pass/refine percentage for one quality review. */
+export function qualityScorePercent(quality: Quality): number {
+	const aspects = qualityAspectRatings(quality);
 	const passCount = aspects.filter((x) => x.rate === "Pass").length;
 	const refineCount = aspects.filter((x) => x.rate === "Refine").length;
 	return Math.floor((passCount * 100 + refineCount * 50) / aspects.length);
 }
-/** Return whether acceptable is true. */
 
-export function isAcceptable(quality: Quality): boolean {
-	return percentageScore(quality) >= 80;
+/** Return whether one quality review is good enough to stop refinement. */
+export function isQualityAcceptable(quality: Quality): boolean {
+	return qualityScorePercent(quality) >= 80;
 }

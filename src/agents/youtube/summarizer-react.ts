@@ -18,9 +18,9 @@ import {
 } from "./prompts.js";
 import {
 	GarbageIdentificationSchema,
-	isAcceptable,
-	percentageScore,
+	isQualityAcceptable,
 	QualitySchema,
+	qualityScorePercent,
 	type Summary,
 	SummarySchema,
 } from "./schemas.js";
@@ -42,8 +42,8 @@ const SummarizerState = Annotation.Root({
 });
 
 type SummarizerStateType = typeof SummarizerState.State;
-/** Helper for garbage filter node. */
 
+/** Remove transcript ranges identified as non-content by the fast filter model. */
 async function garbageFilterNode(state: SummarizerStateType) {
 	if (!state.transcript) {
 		return {};
@@ -67,8 +67,8 @@ async function garbageFilterNode(state: SummarizerStateType) {
 	const filtered = filterContent(taggedTranscript, garbage.garbage_ranges);
 	return { transcript: untagContent(filtered) };
 }
-/** Helper for summary node. */
 
+/** Generate a structured summary from the current transcript state. */
 async function summaryNode(state: SummarizerStateType) {
 	const llm = ChatOpenAI({
 		model: SUMMARY_MODEL,
@@ -88,8 +88,8 @@ async function summaryNode(state: SummarizerStateType) {
 		iterationCount: (state.iterationCount ?? 0) + 1,
 	};
 }
-/** Helper for quality node. */
 
+/** Score the current summary so the graph can stop or refine it. */
 async function qualityNode(state: SummarizerStateType) {
 	const llm = ChatOpenAI({
 		model: QUALITY_MODEL,
@@ -108,13 +108,15 @@ async function qualityNode(state: SummarizerStateType) {
 
 	return {
 		quality,
-		isComplete: isAcceptable(quality),
+		isComplete: isQualityAcceptable(quality),
 	};
 }
 /** Return whether ReAct graph YouTube summarization should continue. */
 
 function shouldContinue(state: SummarizerStateType) {
-	const qualityPercent = state.quality ? percentageScore(state.quality) : null;
+	const qualityPercent = state.quality
+		? qualityScorePercent(state.quality)
+		: null;
 
 	if (state.isComplete) {
 		return END;
@@ -122,7 +124,7 @@ function shouldContinue(state: SummarizerStateType) {
 
 	if (
 		state.quality &&
-		!isAcceptable(state.quality) &&
+		!isQualityAcceptable(state.quality) &&
 		(state.iterationCount ?? 0) < MAX_ITERATIONS
 	) {
 		return "summary";
